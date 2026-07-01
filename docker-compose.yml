@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      # .env.local is gitignored — copy .env.example and fill in your values.
+      # Secrets are mounted at runtime, never baked into the image.
+      - .env.local
+    volumes:
+      # SQLite database file lives on the host, persists across container restarts.
+      # for production, swap SQLite volume for RDS PostgreSQL via DATABASE_URL environment variable
+      - ./local.db:/app/local.db
+      # Mount document folder for classification (optional — can also pass via CLI)
+      - ./documents:/app/documents

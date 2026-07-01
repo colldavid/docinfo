@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# DocInfo project-specific
+local.db
+local.db-journal
+data/edgar/
+cache/
+documents/
+eval/report_*.json
