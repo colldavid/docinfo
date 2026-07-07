@@ -220,6 +220,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # DocInfo project-specific
+.venv/
 local.db
 local.db-journal
 data/edgar/

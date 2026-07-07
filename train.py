@@ -98,8 +98,11 @@ def train_classifier(
     label_counts = {l: labels.count(l) for l in set(labels)}
     logger.info(f"\n{label_name} label distribution: {label_counts}")
 
+    # Stratify only when every class has >= 2 examples; fall back otherwise
+    min_class_count = min(np.bincount(y))
+    use_stratify = y if min_class_count >= 2 else None
     X_train, X_test, y_train, y_test = train_test_split(
-        embeddings, y, test_size=test_size, random_state=random_state, stratify=y
+        embeddings, y, test_size=test_size, random_state=random_state, stratify=use_stratify
     )
 
     logger.info(f"Training {label_name} classifier ({X_train.shape[0]} train, {X_test.shape[0]} test)...")
@@ -114,14 +117,19 @@ def train_classifier(
 
     y_pred = model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
+    # Use only classes present in the test set to avoid target_names mismatch
+    present_labels = sorted(set(y_test) | set(y_pred))
+    present_names = encoder.inverse_transform(present_labels)
     report = classification_report(
         y_test, y_pred,
-        target_names=encoder.classes_,
+        labels=present_labels,
+        target_names=present_names,
         output_dict=True,
+        zero_division=0,
     )
 
     logger.info(f"\n{label_name} accuracy: {acc:.3f}")
-    logger.info(classification_report(y_test, y_pred, target_names=encoder.classes_))
+    logger.info(classification_report(y_test, y_pred, labels=present_labels, target_names=present_names, zero_division=0))
 
     return model, encoder, {"accuracy": acc, "per_label": report}
 
@@ -138,6 +146,11 @@ def main(
         "--model-dir",
         help="Directory to save trained model files",
     ),
+    min_samples: int = typer.Option(
+        20,
+        "--min-samples",
+        help="Minimum samples required to train (lower for smoke tests)",
+    ),
 ):
     """Train classifiers on EDGAR data and save model files."""
     if not data_file.exists():
@@ -152,9 +165,9 @@ def main(
 
     texts, doc_types, industries = load_samples(data_file)
 
-    if len(texts) < 20:
+    if len(texts) < min_samples:
         typer.echo(
-            f"ERROR: Only {len(texts)} samples found. Need at least 20 to train.\n"
+            f"ERROR: Only {len(texts)} samples found. Need at least {min_samples} to train.\n"
             "Re-run data/edgar_download.py with a larger SAMPLES_PER_FORM value.",
             err=True,
         )

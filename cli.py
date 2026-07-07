@@ -49,6 +49,12 @@ def _result_to_dict(result: ClassificationResult) -> dict:
             {"label": p.label, "similarity_score": p.similarity_score}
             for p in result.pain_points
         ],
+        "confidentiality": {
+            "label": result.confidentiality.label,
+            "rationale": result.confidentiality.rationale,
+            "confidence": result.confidentiality.confidence,
+            "needs_review": result.confidentiality.needs_review,
+        } if result.confidentiality else None,
         "importance_level": {
             "label": result.importance_level.label,
             "rationale": result.importance_level.rationale,
@@ -72,9 +78,12 @@ def _write_csv(results: list[ClassificationResult], csv_path: Path) -> None:
             "industry_probabilities",
             "pain_points",
             "pain_point_scores",
+            "confidentiality_label",
+            "confidentiality_confidence",
+            "confidentiality_needs_review",
             "importance_label",
             "importance_confidence",
-            "needs_review",
+            "importance_needs_review",
             "rationale",
             "classified_at",
             "error",
@@ -88,6 +97,9 @@ def _write_csv(results: list[ClassificationResult], csv_path: Path) -> None:
                 "|".join(str(p) for p in r.industry.probabilities) if r.industry else "",
                 "|".join(p.label for p in r.pain_points),
                 "|".join(str(p.similarity_score) for p in r.pain_points),
+                r.confidentiality.label if r.confidentiality else "",
+                r.confidentiality.confidence if r.confidentiality else "",
+                r.confidentiality.needs_review if r.confidentiality else "",
                 r.importance_level.label if r.importance_level else "",
                 r.importance_level.confidence if r.importance_level else "",
                 r.importance_level.needs_review if r.importance_level else "",

@@ -18,6 +18,13 @@ class PainPoint(BaseModel):
     similarity_score: float
 
 
+class ConfidentialityResult(BaseModel):
+    label: str  # "public" | "internal" | "confidential" | "restricted"
+    rationale: str
+    confidence: float  # LLM self-report (0-1)
+    needs_review: bool
+
+
 class ImportanceResult(BaseModel):
     label: str  # "low" | "medium" | "high"
     rationale: str
@@ -30,6 +37,7 @@ class ClassificationResult(BaseModel):
     document_type: DocumentTypeResult
     industry: IndustryResult
     pain_points: list[PainPoint]
+    confidentiality: ConfidentialityResult
     importance_level: ImportanceResult
     classified_at: datetime
     error: Optional[str] = None  # set if parsing or classification failed

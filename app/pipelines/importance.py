@@ -3,8 +3,8 @@ Importance level classification pipeline.
 
 Uses Claude Haiku with:
 - A locked rubric in the system prompt
-- Pain points passed explicitly as input (they directly influence the rating)
-- 2-3 few-shot examples per level anchoring how pain points change ratings
+- Pain points AND confidentiality label passed explicitly as inputs
+- 2-3 few-shot examples per level anchoring how both inputs change ratings
 - Temperature 0 for determinism, structured JSON output, schema validation + retries
 - Automatic consistency check when confidence < threshold:
     Re-run N times at temp 0.4, check agreement. Disagreement → needs_review=True.
@@ -28,86 +28,99 @@ level of a document using the rubric and examples below.
 
 ## RUBRIC
 
-HIGH: Material financial figures or binding commitments AND actionable pain points \
-detected (e.g. regulatory deadlines, liquidity risk, executive-level decisions \
-requiring a response). A document is NOT high importance purely due to material \
-financial content — it must also have actionable pain points.
+HIGH: Actionable pain points AND (material financial content OR confidential/restricted \
+classification). Requires both: something operationally urgent AND either financial \
+materiality or sensitivity. A document is NOT high importance on financial content \
+or sensitivity alone — it must also have actionable pain points.
 
-MEDIUM: Market context or supporting analysis with some pain points, OR significant \
-content but limited actionability.
+MEDIUM: Some pain points OR confidential/restricted content, but not both together \
+with high-materiality content. Includes: significant content with limited \
+actionability, or sensitive content with no detected pain points.
 
-LOW: Background research, administrative, introductory, or duplicate content. OR \
-significant content with no pain points detected. A $5B merger announcement with \
-no detected pain points is LOW — it is informational, not operationally important.
+LOW: No pain points AND public/internal confidentiality. Background research, \
+administrative, or informational content that requires no consulting response. \
+A $5B merger announcement with no pain points is LOW — informational, not actionable.
 
 ## FEW-SHOT EXAMPLES
 
-### Example 1 — HIGH
+### Example 1 — HIGH (pain points + confidential + material financials)
 Document excerpt: "Q3 revenue declined 18% YoY. FDA placed a clinical hold on our \
-lead drug candidate pending safety review. Cash runway is 7 months without additional \
-financing."
+lead drug candidate pending safety review. Cash runway is 7 months. DRAFT — DO NOT DISTRIBUTE."
 Detected pain points: ["FDA approval delays", "liquidity risk", "revenue decline"]
+Confidentiality: confidential
 Output:
 {
   "label": "high",
-  "rationale": "Material revenue decline and a 7-month cash runway create urgent \
-liquidity risk. FDA clinical hold on the lead asset is a binding regulatory action \
-requiring immediate executive response. All three pain points are directly actionable.",
+  "rationale": "Confidential document with material revenue decline and 7-month cash \
+runway. FDA clinical hold is a binding regulatory action requiring immediate response. \
+Pain points are actionable and document is not yet public.",
+  "confidence": 0.94
+}
+
+### Example 2 — HIGH (pain points + restricted)
+Document excerpt: "Patient cohort analysis shows 23% readmission rate for DRG 470 \
+cases. Cost per episode exceeds Medicare reimbursement by $4,200. \
+[Contains PHI — restricted access]"
+Detected pain points: ["reimbursement rate compression", "readmission risk"]
+Confidentiality: restricted
+Output:
+{
+  "label": "high",
+  "rationale": "Restricted PHI-containing document with actionable reimbursement \
+and readmission pain points requiring operational response. Sensitivity elevates priority.",
+  "confidence": 0.91
+}
+
+### Example 3 — MEDIUM (pain points, public document)
+Document excerpt: "Global semiconductor supply constraints continued to impact \
+production volumes in Q2. Management expects normalization by H2 2025."
+Detected pain points: ["supply chain delay", "production volume impact"]
+Confidentiality: public
+Output:
+{
+  "label": "medium",
+  "rationale": "Pain points present and relevant, but document is publicly available \
+market context — not client-specific or confidential. Useful for ongoing monitoring.",
+  "confidence": 0.83
+}
+
+### Example 4 — MEDIUM (confidential, no pain points)
+Document excerpt: "Internal pricing model for the Apex account renewal. \
+Proposed discount: 18%. Competitor pricing benchmarks attached. INTERNAL ONLY."
+Detected pain points: []
+Confidentiality: confidential
+Output:
+{
+  "label": "medium",
+  "rationale": "Confidential pricing document with competitive intelligence, but no \
+actionable pain points detected. Sensitivity warrants attention even without urgent issues.",
+  "confidence": 0.81
+}
+
+### Example 5 — LOW (no pain points, public)
+Document excerpt: "We are pleased to announce the successful completion of our \
+$4.2B acquisition of Horizon Analytics. Integration is proceeding on schedule."
+Detected pain points: []
+Confidentiality: public
+Output:
+{
+  "label": "low",
+  "rationale": "Public press release with no detected pain points. Despite material \
+transaction size, no operational issues require a consulting response.",
   "confidence": 0.92
 }
 
-### Example 2 — MEDIUM
-Document excerpt: "Global semiconductor supply constraints continued to impact \
-production volumes in Q2. Management expects normalization by H2 2025, though \
-the timeline carries uncertainty."
-Detected pain points: ["supply chain delay", "production volume impact"]
-Output:
-{
-  "label": "medium",
-  "rationale": "Supply chain pain points are present and relevant, but no binding \
-commitments or immediate financial risk requiring urgent action. Useful market context \
-for ongoing monitoring.",
-  "confidence": 0.84
-}
-
-### Example 3 — LOW (high financial content, no pain points)
-Document excerpt: "We are pleased to announce the successful completion of our \
-$4.2B acquisition of Horizon Analytics. The integration is proceeding on schedule \
-and we expect synergies to materialize in 18-24 months."
+### Example 6 — LOW (administrative, internal)
+Document excerpt: "Welcome to GlobalTech! This guide covers your first two weeks. \
+Pick up your laptop from IT. Complete your I-9 with HR."
 Detected pain points: []
+Confidentiality: internal
 Output:
 {
   "label": "low",
-  "rationale": "Despite material transaction size, no actionable pain points were \
-detected. The announcement is informational — integration is on track and no \
-operational issues require a consulting response.",
-  "confidence": 0.88
-}
-
-### Example 4 — LOW (administrative)
-Document excerpt: "This document outlines the agenda for the Q4 all-hands meeting. \
-Topics include team updates, holiday schedule, and benefits enrollment reminder."
-Detected pain points: []
-Output:
-{
-  "label": "low",
-  "rationale": "Administrative content with no financial, strategic, or operational \
+  "rationale": "Internal onboarding guide with no financial, strategic, or operational \
 relevance to consulting engagement.",
   "confidence": 0.97
-}
-
-### Example 5 — MEDIUM (significant content, limited actionability)
-Document excerpt: "Industry analysis of the European renewable energy market projects \
-15% CAGR through 2030, driven by regulatory tailwinds and declining solar costs. \
-Key risks include grid infrastructure bottlenecks and permitting delays."
-Detected pain points: ["regulatory risk", "infrastructure bottleneck"]
-Output:
-{
-  "label": "medium",
-  "rationale": "Relevant market context with two pain points identified. Pain points \
-are structural/sector-level rather than client-specific actionable issues. Useful \
-as supporting analysis.",
-  "confidence": 0.79
 }
 
 ## OUTPUT FORMAT
@@ -124,16 +137,18 @@ USER_PROMPT_TEMPLATE = """\
 Classify the following document.
 
 Detected pain points: {pain_points_json}
+Confidentiality: {confidentiality_label}
 
 Document text (truncated):
 {text}
 """
 
 
-def _build_user_prompt(text: str, pain_points: list[dict]) -> str:
+def _build_user_prompt(text: str, pain_points: list[dict], confidentiality_label: str) -> str:
     pain_point_labels = [p["label"] for p in pain_points]
     return USER_PROMPT_TEMPLATE.format(
         pain_points_json=json.dumps(pain_point_labels),
+        confidentiality_label=confidentiality_label,
         text=text[:3000],
     )
 
@@ -225,6 +240,7 @@ def _consistency_check(
 def classify_importance(
     text: str,
     pain_points: list[dict],
+    confidentiality_label: str = "internal",
 ) -> dict[str, Any]:
     """
     Classify document importance level.
@@ -238,7 +254,7 @@ def classify_importance(
     }
     """
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    user_message = _build_user_prompt(text, pain_points)
+    user_message = _build_user_prompt(text, pain_points, confidentiality_label)
 
     # Primary classification at temp 0
     result = _call_with_retry(client, user_message, temperature=0)

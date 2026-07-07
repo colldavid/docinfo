@@ -1,15 +1,16 @@
 # DocInfo
 
-Document intelligence tool for consulting workflows. Point it at a folder of PDFs, DOCX, or TXT files — it classifies each document across four independent dimensions and surfaces aggregated insights.
+Document intelligence tool for consulting workflows. Point it at a folder of PDFs, DOCX, or TXT files — it classifies each document across five independent dimensions and surfaces aggregated insights.
 
 ## Classification dimensions
 
-| Dimension | Technique | Ground truth |
+| Dimension | Technique | Eval approach |
 |---|---|---|
-| **Document type** | Embeddings + logistic regression | SEC EDGAR filing types |
-| **Industry/sector** | Embeddings + logistic regression | SEC SIC codes → taxonomy |
-| **Pain points** | LLM candidate generation + embedding similarity | Threshold calibration (no objective truth) |
-| **Importance level** | LLM (Haiku) with locked rubric + few-shot examples | Sonnet-as-judge + hand-labeled spot-check |
+| **Document type** | Embeddings + logistic regression trained on SEC EDGAR filings | Accuracy against EDGAR ground truth labels |
+| **Industry/sector** | Embeddings + logistic regression trained on SEC SIC codes | Accuracy against SIC-derived ground truth labels |
+| **Pain points** | Haiku generates ~25 industry-specific candidates; document is matched against them via cosine similarity; matches above a tunable threshold are surfaced | No ground truth — threshold is a judgment call tuned by spot-checking whether surfaced matches feel relevant |
+| **Confidentiality** | LLM (Haiku) with locked rubric + few-shot examples | Agreement rate vs. Sonnet-as-judge labels |
+| **Importance level** | LLM (Haiku) with locked rubric + few-shot examples; takes pain points and confidentiality as explicit inputs | Agreement rate vs. Sonnet-as-judge labels |
 
 ---
 
@@ -85,14 +86,15 @@ Teammates pull the new models with `git pull` — no training on their end.
 
 ```bash
 # Full eval across all dimensions
-python eval/harness.py --data eval/labeled_set.jsonl
-
-# Pain point threshold calibration sweep only
-python eval/harness.py --data eval/labeled_set.jsonl --mode threshold-calibration
+PYTHONPATH=. python eval/harness.py --data eval/labeled_set.jsonl
 
 # Importance rubric ablation: compare variants
-python eval/harness.py --data eval/labeled_set.jsonl --mode ablation \
+PYTHONPATH=. python eval/harness.py --data eval/labeled_set.jsonl --mode ablation \
     --rubric-variants eval/rubric_v1.txt eval/rubric_v2.txt
+
+# Confidentiality rubric ablation: compare variants
+PYTHONPATH=. python eval/harness.py --data eval/labeled_set.jsonl --mode ablation-confidentiality \
+    --rubric-variants eval/conf_rubric_v1.txt eval/conf_rubric_v2.txt
 ```
 
 Report is printed to console and saved to `eval/report_<timestamp>.json`.
@@ -107,13 +109,14 @@ One JSON object per line:
   "doc_type_label": "financial_report",
   "industry_label": "technology",
   "pain_points": ["supply chain delay", "margin compression"],
+  "confidentiality_label": "confidential",
   "importance_label": "high"
 }
 ```
 
 - `doc_type_label` and `industry_label`: derived from EDGAR (objective ground truth)
-- `pain_points`: hand-labeled spot-check set (30-50 docs); used for threshold calibration
-- `importance_label`: Sonnet-as-judge labels, supplemented with hand-labeled examples
+- `pain_points`: optional; if present, surfaced in output but not evaluated against ground truth — there is no ground truth for pain points
+- `confidentiality_label` and `importance_label`: Sonnet-as-judge labels, supplemented with hand-labeled examples
 
 ---
 
@@ -130,10 +133,16 @@ Per-document JSON:
     { "label": "supply chain delay", "similarity_score": 0.82 },
     { "label": "margin compression", "similarity_score": 0.74 }
   ],
+  "confidentiality": {
+    "label": "confidential",
+    "rationale": "Non-public financial results including guidance withdrawal and covenant breach risk.",
+    "confidence": 0.95,
+    "needs_review": false
+  },
   "importance_level": {
     "label": "high",
-    "rationale": "Material revenue decline with actionable liquidity risk and supply chain pain points requiring immediate response",
-    "confidence": 0.81,
+    "rationale": "Confidential document with material revenue decline and actionable liquidity risk requiring immediate response.",
+    "confidence": 0.91,
     "needs_review": false
   },
   "classified_at": "2025-01-15T14:32:00Z"
@@ -141,9 +150,9 @@ Per-document JSON:
 ```
 
 Field naming is intentional:
-- `document_type` and `industry` use `probability` — real calibrated classifier output
-- `importance_level` uses `confidence` — LLM self-report, not a calibrated probability
-- `pain_points` use `similarity_score` — cosine similarity from embedding comparison
+- `document_type` and `industry` use `probability` — real calibrated output from the logistic regression classifier
+- `confidentiality` and `importance_level` use `confidence` — LLM self-report, not a calibrated probability
+- `pain_points` use `similarity_score` — cosine similarity between the document embedding and the candidate embedding
 
 ---
 
@@ -160,8 +169,9 @@ docinfo/
 │   └── pipelines/
 │       ├── embeddings.py  # Sentence-transformer wrapper
 │       ├── classifier.py  # Logistic regression wrapper
-│       ├── pain_points.py # Haiku + embedding similarity
-│       └── importance.py  # Haiku rubric + consistency check
+│       ├── pain_points.py      # Haiku candidate generation + embedding similarity
+│       ├── confidentiality.py  # Haiku rubric + consistency check
+│       └── importance.py       # Haiku rubric + consistency check (takes pain points + confidentiality)
 ├── data/
 │   ├── edgar_download.py  # EDGAR data pull script
 │   └── sic_to_industry.json  # Editable SIC → taxonomy mapping

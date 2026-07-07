@@ -1,5 +1,5 @@
 """
-Core classification orchestrator. Runs all four pipelines in sequence for a
+Core classification orchestrator. Runs all five pipelines in sequence for a
 single document and returns a ClassificationResult.
 
 Imported by both the CLI and the FastAPI routes.
@@ -11,6 +11,7 @@ from pathlib import Path
 
 from app.models import (
     ClassificationResult,
+    ConfidentialityResult,
     DocumentTypeResult,
     ImportanceResult,
     IndustryResult,
@@ -18,6 +19,7 @@ from app.models import (
 )
 from app.pipelines.classifier import classify_document_type, classify_industry
 from app.pipelines.pain_points import detect_pain_points
+from app.pipelines.confidentiality import classify_confidentiality
 from app.pipelines.importance import classify_importance
 
 logger = logging.getLogger(__name__)
@@ -27,10 +29,11 @@ def classify_document(path: Path, text: str) -> ClassificationResult:
     """
     Run the full classification pipeline on a single parsed document.
     Pipelines run in dependency order:
-      1. document_type  (no deps)
-      2. industry       (no deps)
-      3. pain_points    (needs industry)
-      4. importance     (needs pain_points)
+      1. document_type    (no deps)
+      2. industry         (no deps)
+      3. pain_points      (needs industry)
+      4. confidentiality  (no deps on other pipeline outputs)
+      5. importance       (needs pain_points + confidentiality)
     """
     filename = path.name
 
@@ -47,8 +50,19 @@ def classify_document(path: Path, text: str) -> ClassificationResult:
     pain_point_dicts = detect_pain_points(text, industry=primary_industry)
     logger.debug(f"{filename}: pain_points={[p['label'] for p in pain_point_dicts]}")
 
-    # 4. Importance (pain points are explicit input)
-    importance_dict = classify_importance(text, pain_points=pain_point_dicts)
+    # 4. Confidentiality
+    confidentiality_dict = classify_confidentiality(text)
+    logger.debug(
+        f"{filename}: confidentiality={confidentiality_dict['label']} "
+        f"(confidence={confidentiality_dict['confidence']:.2f})"
+    )
+
+    # 5. Importance (pain points + confidentiality are explicit inputs)
+    importance_dict = classify_importance(
+        text,
+        pain_points=pain_point_dicts,
+        confidentiality_label=confidentiality_dict["label"],
+    )
     logger.debug(
         f"{filename}: importance={importance_dict['label']} "
         f"(confidence={importance_dict['confidence']:.2f}, "
@@ -69,6 +83,12 @@ def classify_document(path: Path, text: str) -> ClassificationResult:
             PainPoint(label=p["label"], similarity_score=p["similarity_score"])
             for p in pain_point_dicts
         ],
+        confidentiality=ConfidentialityResult(
+            label=confidentiality_dict["label"],
+            rationale=confidentiality_dict["rationale"],
+            confidence=round(confidentiality_dict["confidence"], 4),
+            needs_review=confidentiality_dict["needs_review"],
+        ),
         importance_level=ImportanceResult(
             label=importance_dict["label"],
             rationale=importance_dict["rationale"],
