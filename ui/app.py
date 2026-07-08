@@ -131,72 +131,97 @@ st.sidebar.caption("Document intelligence for consulting.")
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
-if page == "Classify":
-    st.title("Classify a Document")
+def _persist_result(result) -> ClassificationRecord:
+    with get_session() as session:
+        record = ClassificationRecord(
+            filename=result.filename,
+            classified_at=result.classified_at,
+            doc_type_label=result.document_type.label if result.document_type else None,
+            doc_type_probability=result.document_type.probability if result.document_type else None,
+            industry=result.industry,
+            pain_points=[
+                {"label": p.label, "similarity_score": p.similarity_score}
+                for p in result.pain_points
+            ],
+            confidentiality_label=result.confidentiality.label if result.confidentiality else None,
+            confidentiality_rationale=result.confidentiality.rationale if result.confidentiality else None,
+            confidentiality_confidence=result.confidentiality.confidence if result.confidentiality else None,
+            confidentiality_needs_review=result.confidentiality.needs_review if result.confidentiality else None,
+            importance_label=result.importance_level.label if result.importance_level else None,
+            importance_rationale=result.importance_level.rationale if result.importance_level else None,
+            importance_confidence=result.importance_level.confidence if result.importance_level else None,
+            importance_needs_review=result.importance_level.needs_review if result.importance_level else None,
+            error=result.error,
+        )
+        session.add(record)
+        session.commit()
+        session.refresh(record)
+        session.expunge(record)
+        return record
 
-    uploaded = st.file_uploader(
-        "Upload a document", type=["pdf", "docx", "txt"],
-        help="Supported formats: PDF, Word (.docx), plain text"
+
+if page == "Classify":
+    st.title("Classify Documents")
+
+    uploaded_files = st.file_uploader(
+        "Upload one or more documents", type=["pdf", "docx", "txt"],
+        accept_multiple_files=True,
+        help="Supported formats: PDF, Word (.docx), plain text. Select multiple files to classify a folder."
     )
     industry = st.selectbox(
-        "Industry (optional)",
+        "Industry (optional — applies to all uploaded documents)",
         options=INDUSTRIES,
         format_func=lambda x: x.replace("_", " ").title() if x else "— Select industry —",
     )
 
-    if uploaded and st.button("Classify", type="primary"):
-        suffix = Path(uploaded.name).suffix.lower()
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(uploaded.read())
-            tmp_path = Path(tmp.name)
+    if uploaded_files and st.button("Classify", type="primary"):
+        records = []
+        errors = []
+        progress = st.progress(0, text="Starting…")
 
-        with st.spinner("Running classification pipeline…"):
+        for i, uploaded in enumerate(uploaded_files):
+            progress.progress((i) / len(uploaded_files), text=f"Classifying {uploaded.name}…")
+            suffix = Path(uploaded.name).suffix.lower()
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(uploaded.read())
+                tmp_path = Path(tmp.name)
             try:
                 text = parse_document(tmp_path)
                 if not text or not text.strip():
-                    st.error("Could not extract text from this document.")
-                    st.stop()
-
+                    errors.append(f"{uploaded.name}: could not extract text")
+                    continue
                 result = classify_document(
                     tmp_path.with_name(uploaded.name),
                     text,
                     industry=industry or None,
                 )
-
-                # Persist
-                with get_session() as session:
-                    record = ClassificationRecord(
-                        filename=result.filename,
-                        classified_at=result.classified_at,
-                        doc_type_label=result.document_type.label if result.document_type else None,
-                        doc_type_probability=result.document_type.probability if result.document_type else None,
-                        industry=result.industry,
-                        pain_points=[
-                            {"label": p.label, "similarity_score": p.similarity_score}
-                            for p in result.pain_points
-                        ],
-                        confidentiality_label=result.confidentiality.label if result.confidentiality else None,
-                        confidentiality_rationale=result.confidentiality.rationale if result.confidentiality else None,
-                        confidentiality_confidence=result.confidentiality.confidence if result.confidentiality else None,
-                        confidentiality_needs_review=result.confidentiality.needs_review if result.confidentiality else None,
-                        importance_label=result.importance_level.label if result.importance_level else None,
-                        importance_rationale=result.importance_level.rationale if result.importance_level else None,
-                        importance_confidence=result.importance_level.confidence if result.importance_level else None,
-                        importance_needs_review=result.importance_level.needs_review if result.importance_level else None,
-                        error=result.error,
-                    )
-                    session.add(record)
-                    session.commit()
-                    session.refresh(record)
-                    session.expunge(record)
-
-                st.success(f"✅ Classified **{uploaded.name}**")
-                show_result_detail(record)
-
+                record = _persist_result(result)
+                records.append(record)
             except Exception as e:
-                st.error(f"Classification failed: {e}")
+                errors.append(f"{uploaded.name}: {e}")
             finally:
                 tmp_path.unlink(missing_ok=True)
+
+        progress.progress(1.0, text="Done.")
+
+        if errors:
+            for err in errors:
+                st.error(err)
+
+        if records:
+            st.success(f"✅ Classified {len(records)} document(s)")
+            if len(records) == 1:
+                show_result_detail(records[0])
+            else:
+                df = records_to_df(records)
+                selected = st.dataframe(
+                    df, use_container_width=True, hide_index=True,
+                    on_select="rerun", selection_mode="single-row",
+                )
+                if selected and selected.selection.rows:
+                    st.divider()
+                    st.subheader(f"📄 {records[selected.selection.rows[0]].filename}")
+                    show_result_detail(records[selected.selection.rows[0]])
 
 
 elif page == "History":
