@@ -90,11 +90,11 @@ PYTHONPATH=. python eval/harness.py --data eval/labeled_set.jsonl
 
 # Importance rubric ablation: compare variants
 PYTHONPATH=. python eval/harness.py --data eval/labeled_set.jsonl --mode ablation \
-    --rubric-variants eval/rubric_v1.txt eval/rubric_v2.txt
+    --dimension importance --rubric-variants eval/rubric_v1.txt eval/rubric_v2.txt
 
 # Confidentiality rubric ablation: compare variants
-PYTHONPATH=. python eval/harness.py --data eval/labeled_set.jsonl --mode ablation-confidentiality \
-    --rubric-variants eval/conf_rubric_v1.txt eval/conf_rubric_v2.txt
+PYTHONPATH=. python eval/harness.py --data eval/labeled_set.jsonl --mode ablation \
+    --dimension confidentiality --rubric-variants eval/conf_rubric_v1.txt eval/conf_rubric_v2.txt
 ```
 
 Report is printed to console and saved to `eval/report_<timestamp>.json`.

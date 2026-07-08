@@ -8,9 +8,8 @@ class DocumentTypeResult(BaseModel):
     probability: float  # real classifier output, not LLM self-report
 
 
-class IndustryResult(BaseModel):
-    labels: list[str]
-    probabilities: list[float]  # per-label, parallel to labels
+# Industry is user-provided (CLI --industry flag or web UI dropdown), not classified.
+# Kept as a plain optional string on ClassificationResult.
 
 
 class PainPoint(BaseModel):
@@ -34,10 +33,10 @@ class ImportanceResult(BaseModel):
 
 class ClassificationResult(BaseModel):
     filename: str
-    document_type: DocumentTypeResult
-    industry: IndustryResult
-    pain_points: list[PainPoint]
-    confidentiality: ConfidentialityResult
-    importance_level: ImportanceResult
+    document_type: Optional[DocumentTypeResult] = None
+    industry: Optional[str] = None  # user-provided, not classified
+    pain_points: list[PainPoint] = []
+    confidentiality: Optional[ConfidentialityResult] = None
+    importance_level: Optional[ImportanceResult] = None
     classified_at: datetime
     error: Optional[str] = None  # set if parsing or classification failed

@@ -41,10 +41,7 @@ def _result_to_dict(result: ClassificationResult) -> dict:
             "label": result.document_type.label,
             "probability": result.document_type.probability,
         },
-        "industry": {
-            "labels": result.industry.labels,
-            "probabilities": result.industry.probabilities,
-        },
+        "industry": result.industry,
         "pain_points": [
             {"label": p.label, "similarity_score": p.similarity_score}
             for p in result.pain_points
@@ -74,8 +71,7 @@ def _write_csv(results: list[ClassificationResult], csv_path: Path) -> None:
             "filename",
             "doc_type_label",
             "doc_type_probability",
-            "industry_labels",
-            "industry_probabilities",
+            "industry",
             "pain_points",
             "pain_point_scores",
             "confidentiality_label",
@@ -93,8 +89,8 @@ def _write_csv(results: list[ClassificationResult], csv_path: Path) -> None:
                 r.filename,
                 r.document_type.label if r.document_type else "",
                 r.document_type.probability if r.document_type else "",
-                "|".join(r.industry.labels) if r.industry else "",
-                "|".join(str(p) for p in r.industry.probabilities) if r.industry else "",
+                r.industry or "",
+                "",
                 "|".join(p.label for p in r.pain_points),
                 "|".join(str(p.similarity_score) for p in r.pain_points),
                 r.confidentiality.label if r.confidentiality else "",
@@ -115,6 +111,7 @@ def classify(
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="JSON output file (default: stdout)"),
     csv_output: Optional[Path] = typer.Option(None, "--csv", help="Optional CSV export path"),
     threshold: Optional[float] = typer.Option(None, "--threshold", help="Pain point similarity threshold (0-1)"),
+    industry: Optional[str] = typer.Option(None, "--industry", "-i", help="Industry/sector for pain point matching (e.g. healthcare, technology, finance)"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ):
     """Classify all documents in FOLDER across all dimensions."""
@@ -143,7 +140,7 @@ def classify(
     for i, (path, text) in enumerate(docs, 1):
         typer.echo(f"  [{i}/{len(docs)}] {path.name}")
         try:
-            result = classify_document(path, text)
+            result = classify_document(path, text, industry=industry)
         except Exception as e:
             logging.getLogger(__name__).error(f"Classification failed for {path.name}: {e}")
             from datetime import timezone

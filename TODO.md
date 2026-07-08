@@ -14,6 +14,9 @@
 - [ ] Run the Sonnet-as-judge labeling script (to be built) on the sample documents to generate confidentiality and importance ground truth labels automatically — these will be Sonnet-generated, not human-validated. Note in eval set that labels are model-generated; replace with real human-reviewed labels when the team has bandwidth.
 - [ ] Build `eval/generate_labels.py` — a script that sends each document in the eval set to Sonnet with a neutral prompt and writes back confidentiality and importance labels to `eval/labeled_set.jsonl`
 - [ ] Add `eval/README.md` explaining the labeled set format, how to run each eval mode, and what the metrics mean
+- [ ] Implement self-consistency entropy as a continuous signal in the eval harness (currently only a binary `needs_review` flag — extend to report entropy score per document)
+- [ ] Implement KL divergence from Sonnet's label distribution in the eval harness — useful for detecting rubric drift after prompt changes (needs ~200+ labeled documents to be reliable)
+- [ ] Implement embedding distance from training set as an out-of-distribution signal for document type and industry classifiers
 
 ## Polish & reliability
 

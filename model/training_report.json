@@ -1,0 +1,195 @@
+{
+  "training_samples": 1542,
+  "doc_type": {
+    "accuracy": 0.9741100323624595,
+    "per_label": {
+      "financial_report": {
+        "precision": 0.9731543624161074,
+        "recall": 1.0,
+        "f1-score": 0.9863945578231292,
+        "support": 290.0
+      },
+      "press_release": {
+        "precision": 1.0,
+        "recall": 0.6470588235294118,
+        "f1-score": 0.7857142857142857,
+        "support": 17.0
+      },
+      "regulatory_filing": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 2.0
+      },
+      "accuracy": 0.9741100323624595,
+      "macro avg": {
+        "precision": 0.6577181208053692,
+        "recall": 0.5490196078431372,
+        "f1-score": 0.5907029478458049,
+        "support": 309.0
+      },
+      "weighted avg": {
+        "precision": 0.9683325731413307,
+        "recall": 0.9741100323624595,
+        "f1-score": 0.968969464808577,
+        "support": 309.0
+      }
+    }
+  },
+  "industry": {
+    "accuracy": 0.2815533980582524,
+    "per_label": {
+      "aerospace_defense": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 5.0
+      },
+      "agriculture": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 3.0
+      },
+      "automotive": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 11.0
+      },
+      "construction": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 4.0
+      },
+      "consumer_goods": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 14.0
+      },
+      "consumer_services": {
+        "precision": 0.10526315789473684,
+        "recall": 0.1,
+        "f1-score": 0.10256410256410256,
+        "support": 20.0
+      },
+      "education": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 4.0
+      },
+      "energy": {
+        "precision": 0.5,
+        "recall": 0.4444444444444444,
+        "f1-score": 0.47058823529411764,
+        "support": 18.0
+      },
+      "finance": {
+        "precision": 0.4375,
+        "recall": 0.35,
+        "f1-score": 0.3888888888888889,
+        "support": 20.0
+      },
+      "healthcare": {
+        "precision": 0.2037037037037037,
+        "recall": 0.55,
+        "f1-score": 0.2972972972972973,
+        "support": 20.0
+      },
+      "hospitality": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 2.0
+      },
+      "insurance": {
+        "precision": 0.8,
+        "recall": 0.2857142857142857,
+        "f1-score": 0.42105263157894735,
+        "support": 14.0
+      },
+      "manufacturing": {
+        "precision": 0.18181818181818182,
+        "recall": 0.1,
+        "f1-score": 0.12903225806451613,
+        "support": 20.0
+      },
+      "media": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 8.0
+      },
+      "mining": {
+        "precision": 0.3333333333333333,
+        "recall": 0.5789473684210527,
+        "f1-score": 0.4230769230769231,
+        "support": 19.0
+      },
+      "other": {
+        "precision": 0.2413793103448276,
+        "recall": 0.35,
+        "f1-score": 0.2857142857142857,
+        "support": 20.0
+      },
+      "professional_services": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 6.0
+      },
+      "real_estate": {
+        "precision": 0.35,
+        "recall": 0.7,
+        "f1-score": 0.4666666666666667,
+        "support": 20.0
+      },
+      "retail": {
+        "precision": 0.07407407407407407,
+        "recall": 0.1,
+        "f1-score": 0.0851063829787234,
+        "support": 20.0
+      },
+      "technology": {
+        "precision": 0.14285714285714285,
+        "recall": 0.15,
+        "f1-score": 0.14634146341463414,
+        "support": 20.0
+      },
+      "telecommunications": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 7.0
+      },
+      "transportation": {
+        "precision": 0.3333333333333333,
+        "recall": 0.2857142857142857,
+        "f1-score": 0.3076923076923077,
+        "support": 14.0
+      },
+      "utilities": {
+        "precision": 0.46153846153846156,
+        "recall": 0.6,
+        "f1-score": 0.5217391304347826,
+        "support": 20.0
+      },
+      "accuracy": 0.2815533980582524,
+      "macro avg": {
+        "precision": 0.18107829125642588,
+        "recall": 0.1997747993171334,
+        "f1-score": 0.17590263363766057,
+        "support": 309.0
+      },
+      "weighted avg": {
+        "precision": 0.24324492118000826,
+        "recall": 0.2815533980582524,
+        "f1-score": 0.24329607910689705,
+        "support": 309.0
+      }
+    }
+  }
+}

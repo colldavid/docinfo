@@ -39,8 +39,10 @@ OUTPUT_DIR = Path(__file__).parent / "edgar"
 OUTPUT_FILE = OUTPUT_DIR / "labeled_samples.jsonl"
 SIC_MAP_FILE = Path(__file__).parent / "sic_to_industry.json"
 
-# Number of filings to sample per form type
-SAMPLES_PER_FORM = 150
+# Target samples per industry (stratified sampling)
+SAMPLES_PER_INDUSTRY = 100
+# Minimum per form type within each industry bucket (so we get variety)
+FORMS_PER_INDUSTRY_BUCKET = 20
 
 # Map EDGAR form types to our doc_type taxonomy
 FORM_TO_DOC_TYPE = {
@@ -57,7 +59,6 @@ TARGET_FORMS = list(FORM_TO_DOC_TYPE.keys())
 
 HEADERS = {
     "User-Agent": "docinfo-classifier research@example.com",  # EDGAR requires a contact
-    "Accept-Encoding": "gzip, deflate",
 }
 
 REQUEST_DELAY = 0.15  # seconds between requests (~6-7/sec, well within limits)
@@ -72,11 +73,25 @@ def fetch(url: str) -> str:
 
 
 def strip_html(html: str) -> str:
-    """Minimal HTML stripping — remove tags and decode common entities."""
-    text = re.sub(r"<[^>]+>", " ", html)
+    """Strip HTML/iXBRL tags and decode common entities, keeping readable text."""
+    # Remove script/style/head blocks entirely
+    text = re.sub(r"<(script|style|head)[^>]*>.*?</\1>", " ", html, flags=re.IGNORECASE | re.DOTALL)
+    # Remove iXBRL non-numeric wrapper tags but keep their text content
+    # e.g. <ix:nonNumeric ...>text</ix:nonNumeric> → text
+    text = re.sub(r"<ix:[^>]+>", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"</ix:[^>]+>", " ", text, flags=re.IGNORECASE)
+    # Remove all remaining HTML tags
+    text = re.sub(r"<[^>]+>", " ", text)
+    # Decode common entities
     text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    text = text.replace("&nbsp;", " ").replace("&#160;", " ")
-    text = re.sub(r"\s{3,}", "\n\n", text)
+    text = text.replace("&nbsp;", " ").replace("&#160;", " ").replace("&#xa0;", " ")
+    text = text.replace("&ldquo;", '"').replace("&rdquo;", '"').replace("&lsquo;", "'").replace("&rsquo;", "'")
+    # Collapse whitespace
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    # Drop lines that are pure numbers/whitespace (XBRL inline data noise)
+    lines = [l for l in text.splitlines() if not re.match(r"^\s*[\d\s\.\,\-\(\)]+\s*$", l) or len(l.strip()) > 20]
+    text = "\n".join(lines)
     return text.strip()
 
 
@@ -103,7 +118,12 @@ def get_quarter_index(year: int, quarter: int) -> list[dict]:
             form_type = line[62:74].strip()
             cik = line[74:86].strip()
             date = line[86:98].strip()
-            filename = line[98:].strip()
+            # filename column may bleed — find the actual edgar/data/ path
+            tail = line[98:]
+            edgar_idx = tail.find("edgar/data/")
+            if edgar_idx == -1:
+                continue
+            filename = tail[edgar_idx:].strip()
             if form_type in TARGET_FORMS:
                 records.append({
                     "cik": cik,
@@ -132,44 +152,85 @@ def get_sic_for_cik(cik: str) -> str | None:
 
 
 def get_filing_text(filename: str) -> str | None:
-    """Download the primary document for a filing index."""
-    index_url = f"{EDGAR_BASE}/Archives/{filename}"
-    # filename is like edgar/data/CIK/ACCESSION/ACCESSION-index.htm
-    # We need to fetch the index page to find the primary document URL
+    """
+    Download the primary document for a filing.
+
+    filename from company.idx is like: edgar/data/CIK/ACCESSION.txt
+    That .txt is the full SGML submission container (multi-document bundle).
+    The actual filing index page lives at:
+      https://www.sec.gov/Archives/edgar/data/CIK/ACCESSION-nodashes/ACCESSION-index.htm
+    """
+    # Derive accession number and CIK from filename path
+    # e.g. edgar/data/1563568/0001437749-23-028283.txt
+    parts = filename.split("/")
+    if len(parts) < 4:
+        return None
+    cik = parts[2]
+    accession_with_ext = parts[3]
+    accession = accession_with_ext.replace(".txt", "")  # e.g. 0001437749-23-028283
+    accession_nodash = accession.replace("-", "")       # e.g. 000143774923028283
+
+    index_url = f"{EDGAR_BASE}/Archives/edgar/data/{cik}/{accession_nodash}/{accession}-index.htm"
     try:
         index_html = fetch(index_url)
         time.sleep(REQUEST_DELAY)
     except Exception as e:
-        logger.debug(f"Failed to fetch index {index_url}: {e}")
+        logger.debug(f"Failed to fetch filing index {index_url}: {e}")
         return None
 
-    # Find the primary document — look for the first .htm/.html/.txt document
-    # that isn't the index file itself
-    accession_dir = "/".join(index_url.rsplit("/", 1)[:-1])
-    match = re.search(
-        r'href="([^"]+\.(?:htm|html|txt))"[^>]*>[^<]*(?:10-K|10-Q|8-K|complete|primary)',
-        index_html,
-        re.IGNORECASE,
-    )
-    if not match:
-        # Fallback: grab the first .htm link that isn't the index
-        match = re.search(r'href="(/Archives/edgar/data/[^"]+\.(?:htm|html|txt))"', index_html)
+    # Find the primary document (Seq=1 row). Primary docs often use the
+    # inline XBRL viewer path /ix?doc=/Archives/... so we match both forms.
+    doc_path = None
 
-    if not match:
+    # Try Seq=1 row — matches both /Archives/... and /ix?doc=/Archives/...
+    seq1 = re.search(
+        r'<td[^>]*>\s*1\s*</td>.*?href="(?:/ix\?doc=)?(/Archives/edgar/data/[^"]+\.(?:htm|html|txt))"',
+        index_html,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if seq1:
+        doc_path = seq1.group(1)
+
+    if not doc_path:
+        # Fallback: find doc whose Type column matches the form type
+        type_match = re.search(
+            r'href="(?:/ix\?doc=)?(/Archives/edgar/data/[^"]+\.(?:htm|html|txt))"[^>]*>[^<]+</a>.*?<td[^>]*>(?:10-K|10-Q|8-K|S-1|20-F|DEF 14A|6-K)\s*</td>',
+            index_html,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if type_match:
+            doc_path = type_match.group(1)
+
+    if not doc_path:
+        # Last resort: first /Archives .htm link that isn't the submission bundle
+        last = re.search(
+            r'href="(?:/ix\?doc=)?(/Archives/edgar/data/[^"]+\.htm)"',
+            index_html,
+        )
+        if last:
+            doc_path = last.group(1)
+
+    if not doc_path:
         logger.debug(f"No primary document found in {index_url}")
         return None
 
-    doc_path = match.group(1)
-    if not doc_path.startswith("/"):
-        doc_path = f"{accession_dir}/{doc_path}"
     doc_url = f"{EDGAR_BASE}{doc_path}"
-
     try:
         raw = fetch(doc_url)
         time.sleep(REQUEST_DELAY)
         text = strip_html(raw)
-        # Truncate to ~8000 chars for training — enough signal, manageable size
-        return text[:8000]
+        if not text:
+            return None
+        # iXBRL docs have machine-readable metadata before human-readable prose.
+        # Skip to the first recognizable section header.
+        start = 0
+        for marker in ["PART I", "ITEM 1", "Item 1", "MANAGEMENT", "Management's Discussion",
+                        "BUSINESS", "Business Overview", "FINANCIAL STATEMENTS"]:
+            idx = text.find(marker)
+            if 0 < idx < len(text) - 500:
+                start = idx
+                break
+        return text[start:start + 8000]
     except Exception as e:
         logger.debug(f"Failed to fetch document {doc_url}: {e}")
         return None
@@ -189,7 +250,7 @@ def main():
         for quarter in [4, 3, 2, 1]:
             records = get_quarter_index(year, quarter)
             all_records.extend(records)
-            if len(all_records) >= SAMPLES_PER_FORM * len(TARGET_FORMS) * 5:
+            if len(all_records) >= SAMPLES_PER_INDUSTRY * 50:
                 break
         else:
             continue
@@ -197,37 +258,63 @@ def main():
 
     logger.info(f"Total candidate filings: {len(all_records)}")
 
-    # Balance: sample up to SAMPLES_PER_FORM per form type
     from collections import defaultdict
     import random
 
     random.seed(42)
-    by_form: dict[str, list[dict]] = defaultdict(list)
-    for r in all_records:
-        by_form[r["form_type"]].append(r)
 
+    # Deduplicate by CIK so we don't over-represent prolific filers
+    seen_ciks: set[str] = set()
+    unique_records = []
+    for r in all_records:
+        if r["cik"] not in seen_ciks:
+            seen_ciks.add(r["cik"])
+            unique_records.append(r)
+    random.shuffle(unique_records)
+    logger.info(f"Unique filers: {len(unique_records)}")
+
+    # Pre-resolve SIC for a large candidate pool so we can stratify by industry.
+    # We fetch SIC until we have enough candidates per industry or exhaust the pool.
+    target_per_industry = SAMPLES_PER_INDUSTRY
+    # How many candidates to resolve before giving up on thin industries
+    max_sic_lookups = min(len(unique_records), target_per_industry * 30)
+
+    by_industry: dict[str, list[dict]] = defaultdict(list)
+    logger.info(f"Pre-resolving SIC codes for up to {max_sic_lookups} candidates...")
+
+    for i, record in enumerate(unique_records[:max_sic_lookups]):
+        if i % 100 == 0:
+            counts = {k: len(v) for k, v in by_industry.items()}
+            filled = sum(1 for v in by_industry.values() if len(v) >= target_per_industry)
+            logger.info(f"  SIC lookup {i}/{max_sic_lookups} — {len(by_industry)} industries, {filled} filled")
+
+        sic = get_sic_for_cik(record["cik"])
+        if not sic:
+            continue
+        industry = (
+            sic_map.get(sic)
+            or sic_map.get(sic[:4])
+            or sic_map.get(sic[:2] + "00")
+            or "other"
+        )
+        record["sic"] = sic
+        record["industry_label"] = industry
+        by_industry[industry].append(record)
+
+    logger.info(f"Industry candidate pool: { {k: len(v) for k, v in sorted(by_industry.items())} }")
+
+    # Stratified sample: up to target_per_industry per industry
     sampled = []
-    for form_type, records in by_form.items():
+    for industry, records in by_industry.items():
         random.shuffle(records)
-        sampled.extend(records[:SAMPLES_PER_FORM])
+        sampled.extend(records[:target_per_industry])
 
     logger.info(f"Sampled {len(sampled)} filings to download")
 
     written = 0
     with open(OUTPUT_FILE, "w") as out:
         for i, record in enumerate(sampled):
-            logger.info(f"[{i+1}/{len(sampled)}] {record['company']} — {record['form_type']}")
-
-            sic = get_sic_for_cik(record["cik"])
-            industry_label = None
-            if sic:
-                # Try exact match, then 4-digit prefix, then first 2 digits
-                industry_label = (
-                    sic_map.get(sic)
-                    or sic_map.get(sic[:4])
-                    or sic_map.get(sic[:2] + "00")
-                    or "other"
-                )
+            logger.info(f"[{i+1}/{len(sampled)}] {record['company']} — {record['form_type']} — {record['industry_label']}")
 
             text = get_filing_text(record["filename"])
             if not text:
@@ -237,10 +324,10 @@ def main():
             row = {
                 "text": text,
                 "doc_type_label": FORM_TO_DOC_TYPE[record["form_type"]],
-                "industry_label": industry_label,
+                "industry_label": record["industry_label"],
                 "source_form": record["form_type"],
                 "source_cik": record["cik"],
-                "source_sic": sic,
+                "source_sic": record["sic"],
             }
             out.write(json.dumps(row) + "\n")
             written += 1

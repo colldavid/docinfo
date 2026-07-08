@@ -14,10 +14,9 @@ from app.models import (
     ConfidentialityResult,
     DocumentTypeResult,
     ImportanceResult,
-    IndustryResult,
     PainPoint,
 )
-from app.pipelines.classifier import classify_document_type, classify_industry
+from app.pipelines.classifier import classify_document_type
 from app.pipelines.pain_points import detect_pain_points
 from app.pipelines.confidentiality import classify_confidentiality
 from app.pipelines.importance import classify_importance
@@ -25,15 +24,20 @@ from app.pipelines.importance import classify_importance
 logger = logging.getLogger(__name__)
 
 
-def classify_document(path: Path, text: str) -> ClassificationResult:
+def classify_document(path: Path, text: str, industry: str | None = None) -> ClassificationResult:
     """
     Run the full classification pipeline on a single parsed document.
+
+    industry: user-provided industry label (e.g. "healthcare", "technology").
+              Used for pain point candidate generation. If None, generic
+              candidates are used. In the web UI this comes from a dropdown;
+              in the CLI it's --industry.
+
     Pipelines run in dependency order:
       1. document_type    (no deps)
-      2. industry         (no deps)
-      3. pain_points      (needs industry)
-      4. confidentiality  (no deps on other pipeline outputs)
-      5. importance       (needs pain_points + confidentiality)
+      2. pain_points      (needs industry)
+      3. confidentiality  (no deps)
+      4. importance       (needs pain_points + confidentiality)
     """
     filename = path.name
 
@@ -41,23 +45,18 @@ def classify_document(path: Path, text: str) -> ClassificationResult:
     doc_type_label, doc_type_prob = classify_document_type(text)
     logger.debug(f"{filename}: doc_type={doc_type_label} ({doc_type_prob:.2f})")
 
-    # 2. Industry
-    industry_labels, industry_probs = classify_industry(text)
-    primary_industry = industry_labels[0] if industry_labels else "other"
-    logger.debug(f"{filename}: industry={industry_labels}")
-
-    # 3. Pain points (uses primary industry for candidate generation)
-    pain_point_dicts = detect_pain_points(text, industry=primary_industry)
+    # 2. Pain points (uses user-supplied industry for candidate generation)
+    pain_point_dicts = detect_pain_points(text, industry=industry or "general")
     logger.debug(f"{filename}: pain_points={[p['label'] for p in pain_point_dicts]}")
 
-    # 4. Confidentiality
+    # 3. Confidentiality
     confidentiality_dict = classify_confidentiality(text)
     logger.debug(
         f"{filename}: confidentiality={confidentiality_dict['label']} "
         f"(confidence={confidentiality_dict['confidence']:.2f})"
     )
 
-    # 5. Importance (pain points + confidentiality are explicit inputs)
+    # 4. Importance (pain points + confidentiality are explicit inputs)
     importance_dict = classify_importance(
         text,
         pain_points=pain_point_dicts,
@@ -75,10 +74,7 @@ def classify_document(path: Path, text: str) -> ClassificationResult:
             label=doc_type_label,
             probability=round(doc_type_prob, 4),
         ),
-        industry=IndustryResult(
-            labels=industry_labels,
-            probabilities=[round(p, 4) for p in industry_probs],
-        ),
+        industry=industry,
         pain_points=[
             PainPoint(label=p["label"], similarity_score=p["similarity_score"])
             for p in pain_point_dicts

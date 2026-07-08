@@ -332,16 +332,16 @@ def _run_ablation_for(
     }
 
 
-def run_ablation(records: list[dict], rubric_paths: list[Path]) -> dict:
-    """Importance rubric ablation."""
-    logger.info("Evaluating baseline importance rubric...")
-    return _run_ablation_for(records, rubric_paths, eval_importance, "baseline")
+ABLATION_DIMENSIONS = {
+    "importance": eval_importance,
+    "confidentiality": eval_confidentiality,
+}
 
 
-def run_ablation_confidentiality(records: list[dict], rubric_paths: list[Path]) -> dict:
-    """Confidentiality rubric ablation."""
-    logger.info("Evaluating baseline confidentiality rubric...")
-    return _run_ablation_for(records, rubric_paths, eval_confidentiality, "baseline")
+def run_ablation(records: list[dict], rubric_paths: list[Path], dimension: str) -> dict:
+    eval_fn = ABLATION_DIMENSIONS[dimension]
+    logger.info(f"Evaluating baseline {dimension} rubric...")
+    return _run_ablation_for(records, rubric_paths, eval_fn, "baseline")
 
 
 # ---------------------------------------------------------------------------
@@ -354,12 +354,17 @@ def main(
     mode: str = typer.Option(
         "full",
         "--mode",
-        help="Eval mode: full | threshold-calibration | ablation | ablation-confidentiality",
+        help="Eval mode: full | threshold-calibration | ablation",
+    ),
+    dimension: str = typer.Option(
+        "importance",
+        "--dimension",
+        help="Dimension to ablate (ablation mode only): importance | confidentiality",
     ),
     rubric_variants: Optional[list[Path]] = typer.Option(
         None,
         "--rubric-variants",
-        help="Rubric variant files for ablation modes",
+        help="Rubric variant files for ablation mode",
     ),
     output_dir: Path = typer.Option(EVAL_OUTPUT_DIR, "--output-dir"),
 ):
@@ -401,15 +406,11 @@ def main(
         if not rubric_variants:
             typer.echo("ERROR: --rubric-variants required for ablation mode", err=True)
             raise typer.Exit(1)
-        typer.echo(f"Running importance rubric ablation ({len(rubric_variants)} variants)...")
-        report["ablation"] = run_ablation(records, rubric_variants)
-
-    elif mode == "ablation-confidentiality":
-        if not rubric_variants:
-            typer.echo("ERROR: --rubric-variants required for ablation-confidentiality mode", err=True)
+        if dimension not in ABLATION_DIMENSIONS:
+            typer.echo(f"ERROR: --dimension must be one of: {', '.join(ABLATION_DIMENSIONS)}", err=True)
             raise typer.Exit(1)
-        typer.echo(f"Running confidentiality rubric ablation ({len(rubric_variants)} variants)...")
-        report["ablation_confidentiality"] = run_ablation_confidentiality(records, rubric_variants)
+        typer.echo(f"Running {dimension} rubric ablation ({len(rubric_variants)} variants)...")
+        report["ablation"] = run_ablation(records, rubric_variants, dimension)
 
     else:
         typer.echo(f"ERROR: Unknown mode: {mode}", err=True)
@@ -435,12 +436,11 @@ def main(
     if "importance" in report:
         imp = report["importance"]
         typer.echo(f"  importance agreement rate:   {imp.get('agreement_rate', 'N/A'):.3f}  (n={imp.get('n', 0)})")
-    for ablation_key in ("ablation", "ablation_confidentiality"):
-        if ablation_key in report:
-            ab = report[ablation_key]
-            typer.echo(f"  best rubric variant ({ablation_key}): {ab['best_variant']}")
-            for variant, metrics in ab["comparison_table"].items():
-                typer.echo(f"    {variant}: agreement={metrics['agreement_rate']:.3f}")
+    if "ablation" in report:
+        ab = report["ablation"]
+        typer.echo(f"  best rubric variant ({dimension}): {ab['best_variant']}")
+        for variant, metrics in ab["comparison_table"].items():
+            typer.echo(f"    {variant}: agreement={metrics['agreement_rate']:.3f}")
 
     # Save report
     output_dir.mkdir(parents=True, exist_ok=True)
