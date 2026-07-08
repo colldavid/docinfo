@@ -18,7 +18,7 @@ class PainPoint(BaseModel):
 
 
 class ConfidentialityResult(BaseModel):
-    label: str  # "public" | "internal" | "confidential" | "restricted"
+    label: str  # "public" | "sensitive" | "restricted"
     rationale: str
     confidence: float  # LLM self-report (0-1)
     needs_review: bool

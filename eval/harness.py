@@ -34,6 +34,7 @@ import json
 import logging
 import sys
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -138,9 +139,10 @@ def eval_pain_points_threshold(
     if thresholds is None:
         thresholds = [round(t, 2) for t in [x / 100 for x in range(40, 90, 5)]]
 
-    labeled = [r for r in records if r.get("pain_points") is not None]
+    # Exclude synthetic records — their pain_points field is the injected label, not hand-validated
+    labeled = [r for r in records if r.get("pain_points") is not None and not r.get("synthetic")]
     if not labeled:
-        return {"error": "No pain_points ground truth in labeled set. Add hand-labeled examples."}
+        return {"skipped": "No hand-labeled pain_points found. Add real hand-labeled examples to run threshold calibration."}
 
     results_by_threshold = {}
     for threshold in thresholds:
@@ -187,7 +189,7 @@ def eval_pain_points_threshold(
     }
 
 
-def eval_confidentiality(records: list[dict], rubric_override: str | None = None) -> dict:
+def eval_confidentiality(records: list[dict], rubric_override: str | None = None, workers: int = 12) -> dict:
     """
     Agreement rate vs. confidentiality_label (Sonnet-as-judge or hand-labeled).
     rubric_override replaces the default system prompt for ablation runs.
@@ -196,24 +198,33 @@ def eval_confidentiality(records: list[dict], rubric_override: str | None = None
     if not labeled:
         return {"error": "No confidentiality_label ground truth in labeled set."}
 
-    y_true, y_pred = [], []
-    for r in labeled:
+    def _classify_one(r: dict):
         text = load_text_for_record(r)
         if not text:
-            continue
-
+            return None
         if rubric_override:
-            original_prompt = conf_module.SYSTEM_PROMPT
+            original = conf_module.SYSTEM_PROMPT
             conf_module.SYSTEM_PROMPT = rubric_override
             try:
                 result = classify_confidentiality(text)
             finally:
-                conf_module.SYSTEM_PROMPT = original_prompt
+                conf_module.SYSTEM_PROMPT = original
         else:
             result = classify_confidentiality(text)
+        return r["confidentiality_label"], result["label"]
 
-        y_true.append(r["confidentiality_label"])
-        y_pred.append(result["label"])
+    y_true, y_pred = [], []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_classify_one, r): r for r in labeled}
+        done = 0
+        for future in as_completed(futures):
+            done += 1
+            if done % 40 == 0:
+                logger.info(f"  confidentiality: {done}/{len(labeled)}")
+            out = future.result()
+            if out:
+                y_true.append(out[0])
+                y_pred.append(out[1])
 
     labels = sorted(set(y_true + y_pred))
     report = classification_report(y_true, y_pred, labels=labels, output_dict=True, zero_division=0)
@@ -232,7 +243,7 @@ def eval_confidentiality(records: list[dict], rubric_override: str | None = None
     }
 
 
-def eval_importance(records: list[dict], rubric_override: str | None = None) -> dict:
+def eval_importance(records: list[dict], rubric_override: str | None = None, workers: int = 12) -> dict:
     """
     Agreement rate vs. importance_label (Sonnet-as-judge or hand-labeled).
     Uses confidentiality_label from the record if available.
@@ -242,26 +253,35 @@ def eval_importance(records: list[dict], rubric_override: str | None = None) -> 
     if not labeled:
         return {"error": "No importance_label ground truth in labeled set."}
 
-    y_true, y_pred = [], []
-    for r in labeled:
+    def _classify_one(r: dict):
         text = load_text_for_record(r)
         if not text:
-            continue
+            return None
         pain_points = [{"label": p, "similarity_score": 1.0} for p in r.get("pain_points", [])]
-        confidentiality_label = r.get("confidentiality_label", "internal")
-
+        confidentiality_label = r.get("confidentiality_label", "sensitive")
         if rubric_override:
-            original_prompt = imp_module.SYSTEM_PROMPT
+            original = imp_module.SYSTEM_PROMPT
             imp_module.SYSTEM_PROMPT = rubric_override
             try:
                 result = classify_importance(text, pain_points, confidentiality_label)
             finally:
-                imp_module.SYSTEM_PROMPT = original_prompt
+                imp_module.SYSTEM_PROMPT = original
         else:
             result = classify_importance(text, pain_points, confidentiality_label)
+        return r["importance_label"], result["label"]
 
-        y_true.append(r["importance_label"])
-        y_pred.append(result["label"])
+    y_true, y_pred = [], []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_classify_one, r): r for r in labeled}
+        done = 0
+        for future in as_completed(futures):
+            done += 1
+            if done % 40 == 0:
+                logger.info(f"  importance: {done}/{len(labeled)}")
+            out = future.result()
+            if out:
+                y_true.append(out[0])
+                y_pred.append(out[1])
 
     labels = sorted(set(y_true + y_pred))
     report = classification_report(y_true, y_pred, labels=labels, output_dict=True, zero_division=0)
@@ -345,6 +365,8 @@ def main(
         help="Rubric variant files for ablation mode",
     ),
     output_dir: Path = typer.Option(EVAL_OUTPUT_DIR, "--output-dir"),
+    workers: int = typer.Option(20, "--workers", "-w", help="Parallel workers for Haiku eval calls"),
+    llm_only: bool = typer.Option(False, "--llm-only", help="Only evaluate LLM pipelines (skip doc_type embeddings and pain points)"),
 ):
     """Run the eval harness and write a report."""
     if not data.exists():
@@ -361,20 +383,21 @@ def main(
     }
 
     if mode == "full":
-        typer.echo("Evaluating document_type classifier...")
-        report["doc_type"] = eval_doc_type(records)
+        typer.echo(f"Evaluating confidentiality classification ({workers} workers)...")
+        report["confidentiality"] = eval_confidentiality(records, workers=workers)
 
-        typer.echo("Evaluating industry classifier...")
-        report["industry"] = eval_industry(records)
+        typer.echo(f"Evaluating importance classification ({workers} workers)...")
+        report["importance"] = eval_importance(records, workers=workers)
 
-        typer.echo("Calibrating pain point threshold...")
-        report["pain_points"] = eval_pain_points_threshold(records)
+        if not llm_only:
+            typer.echo("Evaluating document_type classifier...")
+            report["doc_type"] = eval_doc_type(records)
 
-        typer.echo("Evaluating confidentiality classification...")
-        report["confidentiality"] = eval_confidentiality(records)
+            typer.echo("Evaluating industry classifier...")
+            report["industry"] = eval_industry(records)
 
-        typer.echo("Evaluating importance classification...")
-        report["importance"] = eval_importance(records)
+            typer.echo("Calibrating pain point threshold...")
+            report["pain_points"] = eval_pain_points_threshold(records)
 
     elif mode == "threshold-calibration":
         typer.echo("Running pain point threshold calibration sweep...")

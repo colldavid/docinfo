@@ -28,16 +28,16 @@ level of a document using the rubric and examples below.
 
 ## RUBRIC
 
-HIGH: Actionable pain points AND (material financial content OR confidential/restricted \
+HIGH: Actionable pain points AND (material financial content OR sensitive/restricted \
 classification). Requires both: something operationally urgent AND either financial \
 materiality or sensitivity. A document is NOT high importance on financial content \
 or sensitivity alone — it must also have actionable pain points.
 
-MEDIUM: Some pain points OR confidential/restricted content, but not both together \
+MEDIUM: Some pain points OR sensitive/restricted content, but not both together \
 with high-materiality content. Includes: significant content with limited \
 actionability, or sensitive content with no detected pain points.
 
-LOW: No pain points AND public/internal confidentiality. Background research, \
+LOW: No pain points AND public confidentiality. Background research, \
 administrative, or informational content that requires no consulting response. \
 A $5B merger announcement with no pain points is LOW — informational, not actionable.
 
@@ -47,7 +47,7 @@ A $5B merger announcement with no pain points is LOW — informational, not acti
 Document excerpt: "Q3 revenue declined 18% YoY. FDA placed a clinical hold on our \
 lead drug candidate pending safety review. Cash runway is 7 months. DRAFT — DO NOT DISTRIBUTE."
 Detected pain points: ["FDA approval delays", "liquidity risk", "revenue decline"]
-Confidentiality: confidential
+Confidentiality: sensitive
 Output:
 {
   "label": "high",
@@ -88,7 +88,7 @@ market context — not client-specific or confidential. Useful for ongoing monit
 Document excerpt: "Internal pricing model for the Apex account renewal. \
 Proposed discount: 18%. Competitor pricing benchmarks attached. INTERNAL ONLY."
 Detected pain points: []
-Confidentiality: confidential
+Confidentiality: sensitive
 Output:
 {
   "label": "medium",

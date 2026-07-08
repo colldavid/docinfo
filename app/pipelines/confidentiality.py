@@ -7,10 +7,9 @@ Uses Claude Haiku with:
 - Automatic consistency check when confidence < threshold
 
 Levels (ordered by sensitivity):
-  public       — already public or intended for external distribution
-  internal     — internal use, not sensitive if leaked
-  confidential — sensitive business info, non-public financials, competitive intel
-  restricted   — PII, legally privileged, HIPAA/regulatory, trade secrets
+  public     — already public or intended for external distribution
+  sensitive  — non-public, internal or confidential business content (merged from internal + confidential)
+  restricted — PII, legally privileged, HIPAA/regulatory, trade secrets
 """
 
 import json
@@ -23,7 +22,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-CONFIDENTIALITY_LEVELS = {"public", "internal", "confidential", "restricted"}
+CONFIDENTIALITY_LEVELS = {"public", "sensitive", "restricted"}
 
 SYSTEM_PROMPT = """\
 You are a document security analyst at a consulting firm. Classify the \
@@ -32,21 +31,19 @@ confidentiality level of a document using the rubric and examples below.
 ## RUBRIC
 
 PUBLIC: Already publicly available or explicitly intended for external distribution \
-(e.g. press releases, published market research, public SEC filings, product brochures).
+(e.g. press releases, published market research, public SEC filings, product brochures). \
+Anyone outside the organization can read this without issue.
 
-INTERNAL: Intended for internal use but not sensitive if leaked — would cause \
-embarrassment or minor operational disruption at worst \
-(e.g. meeting notes, general strategy decks, onboarding guides, internal memos).
-
-CONFIDENTIAL: Sensitive business information that could cause meaningful competitive \
-or financial harm if disclosed — not yet public \
-(e.g. non-public financial results, M&A analysis, client lists, pricing models, \
-internal performance reviews).
+SENSITIVE: Any non-public document — from routine internal memos to highly confidential \
+client data. Use this for anything not intended for external audiences: meeting notes, \
+strategy decks, onboarding guides, non-public financials, M&A analysis, pricing models, \
+client lists, internal KPIs, competitive intelligence. The key test: would you hesitate \
+to share this with someone outside the organization? If yes, it is SENSITIVE.
 
 RESTRICTED: Contains PII, legally privileged content, HIPAA/regulatory-covered data, \
 or trade secrets — serious legal, financial, or personal consequences if disclosed \
 (e.g. patient records, attorney-client communications, employee SSNs or compensation, \
-proprietary formulas, classified government data).
+proprietary formulas, pre-announcement material non-public information).
 
 ## FEW-SHOT EXAMPLES
 
@@ -71,63 +68,65 @@ Output:
   "confidence": 0.96
 }
 
-### Example 3 — INTERNAL
-Document excerpt: "Welcome to GlobalTech! This onboarding guide covers your first \
-two weeks. Please pick up your laptop from IT and complete your I-9 with HR."
-Output:
-{
-  "label": "internal",
-  "rationale": "Standard employee onboarding material. Intended for internal use \
-only but contains no sensitive business or personal information.",
-  "confidence": 0.93
-}
-
-### Example 4 — INTERNAL
+### Example 3 — SENSITIVE (routine internal)
 Document excerpt: "Q4 All-Hands Agenda. Topics: team updates, holiday schedule, \
-Q3 retrospective, snack preferences survey results."
+Q3 retrospective. This communication is for internal distribution only."
 Output:
 {
-  "label": "internal",
-  "rationale": "Internal meeting agenda with no sensitive financial or personal content.",
+  "label": "sensitive",
+  "rationale": "Internal meeting agenda not intended for external distribution. \
+Not a public document, even though content is not highly sensitive.",
   "confidence": 0.91
 }
 
-### Example 5 — CONFIDENTIAL
+### Example 4 — SENSITIVE (operational KPIs)
+Document excerpt: "Q3 Operations Update — Internal Distribution. Customer satisfaction \
+scores improved to 87%. On-time delivery held at 94%. Hiring in the East region \
+remains 2 positions behind plan."
+Output:
+{
+  "label": "sensitive",
+  "rationale": "Internal operational update with non-public KPIs. Not intended for \
+external audiences.",
+  "confidence": 0.90
+}
+
+### Example 5 — SENSITIVE (non-public financials)
 Document excerpt: "ACME Corporation Q3 2024 Earnings Report. Revenue declined 18% \
 to $412M. We are withdrawing full-year guidance. Covenant breach risk identified. \
 DRAFT — DO NOT DISTRIBUTE."
 Output:
 {
-  "label": "confidential",
-  "rationale": "Non-public financial results including guidance withdrawal and \
-covenant breach risk. Marked draft — not yet released to public markets.",
+  "label": "sensitive",
+  "rationale": "Non-public draft financial results with material disclosures. Marked \
+do not distribute — not yet released to public markets.",
   "confidence": 0.95
 }
 
-### Example 6 — CONFIDENTIAL
+### Example 6 — SENSITIVE (competitive intelligence)
 Document excerpt: "Competitive analysis: pricing comparison vs. our top 5 competitors. \
 Our unit cost advantage is 23%. Proposed Q1 pricing strategy enclosed. \
 INTERNAL USE ONLY."
 Output:
 {
-  "label": "confidential",
-  "rationale": "Proprietary pricing strategy and competitive cost data. Disclosure \
-would harm competitive position.",
-  "confidence": 0.92
+  "label": "sensitive",
+  "rationale": "Proprietary pricing strategy and competitive cost data not intended \
+for external disclosure.",
+  "confidence": 0.93
 }
 
-### Example 7 — RESTRICTED
+### Example 7 — RESTRICTED (PHI)
 Document excerpt: "Patient ID 447821. Diagnosis: Stage III pancreatic carcinoma. \
 Treatment protocol: gemcitabine 1000mg/m2 weekly. Insurance ID: BC8847291."
 Output:
 {
   "label": "restricted",
-  "rationale": "Contains identifiable patient health information (diagnosis, treatment, \
-insurance ID) — HIPAA-covered PHI.",
+  "rationale": "Contains identifiable patient health information — HIPAA-covered PHI. \
+Disclosure carries serious legal consequences.",
   "confidence": 0.99
 }
 
-### Example 8 — RESTRICTED
+### Example 8 — RESTRICTED (attorney-client privilege)
 Document excerpt: "PRIVILEGED AND CONFIDENTIAL — ATTORNEY-CLIENT COMMUNICATION. \
 Re: potential liability exposure from the Meridian class action. Our counsel's \
 assessment of settlement range: $45M–$80M."
@@ -143,7 +142,7 @@ strategy and settlement valuation. Disclosure could waive privilege.",
 Respond with ONLY valid JSON. No explanation, no markdown, no extra text.
 Schema:
 {
-  "label": "public" | "internal" | "confidential" | "restricted",
+  "label": "public" | "sensitive" | "restricted",
   "rationale": "<1-2 sentences>",
   "confidence": <float 0.0-1.0>
 }
@@ -224,7 +223,7 @@ def _consistency_check(
             logger.warning(f"Confidentiality consistency check run {i+1} failed: {e}")
 
     if not labels:
-        return "internal", True
+        return "sensitive", True
 
     majority = max(set(labels), key=labels.count)
     needs_review = len(set(labels)) > 1

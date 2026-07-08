@@ -36,8 +36,7 @@ INDUSTRIES = [
 
 CONFIDENTIALITY_COLORS = {
     "public": "🟢",
-    "internal": "🔵",
-    "confidential": "🟠",
+    "sensitive": "🟠",
     "restricted": "🔴",
 }
 
