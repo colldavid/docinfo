@@ -20,5 +20,9 @@ anthropic==0.40.0
 # CLI
 typer==0.13.1
 
+# Database
+sqlalchemy==2.0.36
+
 # Utilities
 python-dotenv==1.0.1
+python-multipart==0.0.12

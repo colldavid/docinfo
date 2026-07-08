@@ -42,7 +42,7 @@ import typer
 from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support
 
 from app.ingestion import parse_document
-from app.pipelines.classifier import classify_document_type, classify_industry
+from app.pipelines.classifier import classify_document_type
 from app.pipelines.pain_points import detect_pain_points
 from app.pipelines.confidentiality import classify_confidentiality
 import app.pipelines.confidentiality as conf_module
@@ -72,7 +72,13 @@ def load_labeled_set(path: Path) -> list[dict]:
 
 
 def load_text_for_record(record: dict) -> str | None:
-    fp = Path(record["filepath"])
+    # Synthetic records embed text directly
+    if record.get("text"):
+        return record["text"]
+    fp = record.get("filepath")
+    if not fp:
+        return None
+    fp = Path(fp)
     if not fp.exists():
         logger.warning(f"File not found, skipping: {fp}")
         return None
@@ -113,36 +119,8 @@ def eval_doc_type(records: list[dict]) -> dict:
 
 
 def eval_industry(records: list[dict]) -> dict:
-    """
-    Multi-label accuracy for industry.
-    A prediction is correct if the ground truth label appears anywhere
-    in the predicted labels list.
-    """
-    n_correct = 0
-    n_total = 0
-    mismatches = []
-
-    for r in records:
-        if "industry_label" not in r:
-            continue
-        text = load_text_for_record(r)
-        if not text:
-            continue
-        pred_labels, pred_probs = classify_industry(text)
-        true_label = r["industry_label"]
-        correct = true_label in pred_labels
-        if correct:
-            n_correct += 1
-        else:
-            mismatches.append({"true": true_label, "predicted": pred_labels})
-        n_total += 1
-
-    return {
-        "top_k_accuracy": n_correct / n_total if n_total else 0,
-        "n": n_total,
-        "mismatches": mismatches,
-        "note": "A prediction is counted correct if ground truth label appears in any predicted label.",
-    }
+    """Industry is now user-provided, not classified — this dimension is skipped."""
+    return {"skipped": "industry is user-provided via --industry flag, not inferred"}
 
 
 def eval_pain_points_threshold(

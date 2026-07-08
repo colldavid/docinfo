@@ -1,8 +1,14 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from pathlib import Path
+
+# Project root is the directory containing this file's parent (app/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
+    model_config = {"env_file": str(_PROJECT_ROOT / ".env.local"), "env_file_encoding": "utf-8", "protected_namespaces": ()}
+
     anthropic_api_key: str
     database_url: str = "sqlite:///local.db"
 
@@ -17,14 +23,10 @@ class Settings(BaseSettings):
     consistency_check_runs: int = 3
     consistency_check_temperature: float = 0.4
 
-    # Paths
-    model_dir: Path = Path("model")
-    cache_dir: Path = Path("cache")
-    data_dir: Path = Path("data")
-
-    class Config:
-        env_file = ".env.local"
-        env_file_encoding = "utf-8"
+    # Paths — resolved relative to project root so CLI works from any directory
+    model_dir: Path = Field(default=_PROJECT_ROOT / "model")
+    cache_dir: Path = Field(default=_PROJECT_ROOT / "cache")
+    data_dir: Path = Field(default=_PROJECT_ROOT / "data")
 
 
 settings = Settings()
