@@ -260,13 +260,14 @@ def classify_importance(
     result = _call_with_retry(client, user_message, temperature=0)
     confidence = result["confidence"]
 
-    needs_review = False
-    if confidence < settings.consistency_check_confidence_threshold:
+    needs_review = confidence < settings.consistency_check_confidence_threshold
+    if needs_review:
         logger.info(
             f"Confidence {confidence:.2f} below threshold "
             f"{settings.consistency_check_confidence_threshold} — running consistency check"
         )
-        majority_label, needs_review = _consistency_check(client, user_message)
+        majority_label, disagreed = _consistency_check(client, user_message)
+        needs_review = needs_review or disagreed
         # If the consistency check produced a different majority, update the label
         # but keep the original rationale (it came from temp=0, most coherent)
         if majority_label != result["label"]:

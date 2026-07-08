@@ -2,15 +2,22 @@
 Shared embedding utility. Loads the sentence-transformers model once and
 caches it in memory for the lifetime of the process.
 """
+import threading
 import numpy as np
-from functools import lru_cache
 from app.config import settings
 
+_model = None
+_model_lock = threading.Lock()
 
-@lru_cache(maxsize=1)
+
 def get_embedding_model():
-    from sentence_transformers import SentenceTransformer
-    return SentenceTransformer(settings.embedding_model)
+    global _model
+    if _model is None:
+        with _model_lock:
+            if _model is None:
+                from sentence_transformers import SentenceTransformer
+                _model = SentenceTransformer(settings.embedding_model)
+    return _model
 
 
 def embed(texts: list[str]) -> np.ndarray:

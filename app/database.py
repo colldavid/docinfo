@@ -48,6 +48,9 @@ class ClassificationRecord(Base):
     importance_confidence = Column(Float)
     importance_needs_review = Column(Boolean)
 
+    # AI-generated summary
+    summary = Column(Text)
+
     error = Column(Text)
 
     @property

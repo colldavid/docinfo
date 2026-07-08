@@ -43,7 +43,11 @@ to share this with someone outside the organization? If yes, it is SENSITIVE.
 RESTRICTED: Contains PII, legally privileged content, HIPAA/regulatory-covered data, \
 or trade secrets — serious legal, financial, or personal consequences if disclosed \
 (e.g. patient records, attorney-client communications, employee SSNs or compensation, \
-proprietary formulas, pre-announcement material non-public information).
+proprietary formulas, pre-announcement material non-public information). \
+IMPORTANT: Non-public financial results (earnings drafts, revenue figures, guidance) \
+are SENSITIVE, not RESTRICTED — financial data requires a specific legal trigger \
+(e.g. pre-announcement MNPI with insider trading risk, or regulatory filing with \
+personal data) to qualify as RESTRICTED.
 
 ## FEW-SHOT EXAMPLES
 
@@ -252,12 +256,13 @@ def classify_confidentiality(text: str) -> dict[str, Any]:
     result = _call_with_retry(client, user_message, temperature=0)
     confidence = result["confidence"]
 
-    needs_review = False
-    if confidence < settings.consistency_check_confidence_threshold:
+    needs_review = confidence < settings.consistency_check_confidence_threshold
+    if needs_review:
         logger.info(
             f"Confidentiality confidence {confidence:.2f} below threshold — running consistency check"
         )
-        majority_label, needs_review = _consistency_check(client, user_message)
+        majority_label, disagreed = _consistency_check(client, user_message)
+        needs_review = needs_review or disagreed
         if majority_label != result["label"]:
             logger.info(f"Consistency check overriding confidentiality: {result['label']} → {majority_label}")
             result["label"] = majority_label

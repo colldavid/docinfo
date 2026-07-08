@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F6FA;
+  --bg-card: rgba(67, 97, 238, 0.04);
+  --bg-card-hover: rgba(67, 97, 238, 0.07);
+  --border-subtle: rgba(0, 0, 0, 0.09);
+  --border-accent: rgba(67, 97, 238, 0.25);
+
+  --text-primary: #0F1117;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
+
+  --accent: #4361EE;
+  --accent-glow: rgba(67, 97, 238, 0.15);
+  --accent-bright: #6680F5;
+  --accent-dim: rgba(67, 97, 238, 0.06);
+
+  --error: #DC2626;
+  --error-bg: rgba(220, 38, 38, 0.05);
+
+  --conf-public: #059669;
+  --conf-sensitive: #D97706;
+  --conf-restricted: #DC2626;
+  --imp-high: #7C3AED;
+  --imp-medium: #2563EB;
+  --imp-low: #6B7280;
+
+  --font-display: 'Space Grotesk', -apple-system, sans-serif;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+
+  --content-max: 1200px;
+  --transition-fast: 150ms ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: var(--font-family);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+#root { min-height: 100vh; }

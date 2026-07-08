@@ -38,5 +38,6 @@ class ClassificationResult(BaseModel):
     pain_points: list[PainPoint] = []
     confidentiality: Optional[ConfidentialityResult] = None
     importance_level: Optional[ImportanceResult] = None
+    summary: Optional[str] = None
     classified_at: datetime
     error: Optional[str] = None  # set if parsing or classification failed

@@ -1,0 +1,71 @@
+.page { display: flex; flex-direction: column; gap: 2rem; }
+
+.header { display: flex; flex-direction: column; gap: 0.5rem; padding-bottom: 0.5rem; }
+
+.accentLine { width: 36px; height: 2px; background: var(--accent); margin-bottom: 0.5rem; }
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.muted {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.error {
+  background: var(--error-bg);
+  border: 1px solid var(--error);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--error);
+}
+
+.allClear {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  padding: 1.5rem;
+  border: 1px solid var(--accent-glow);
+  background: var(--accent-dim);
+}
+
+.flagCount {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--conf-sensitive);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.05);
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+}
+
+.detailCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.detailFilename {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--text-primary);
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}

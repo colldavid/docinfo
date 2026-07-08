@@ -6,6 +6,7 @@ Imported by both the CLI and the FastAPI routes.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from app.pipelines.classifier import classify_document_type
 from app.pipelines.pain_points import detect_pain_points
 from app.pipelines.confidentiality import classify_confidentiality
 from app.pipelines.importance import classify_importance
+from app.pipelines.summarize import summarize_document
 
 logger = logging.getLogger(__name__)
 
@@ -28,45 +30,35 @@ def classify_document(path: Path, text: str, industry: str | None = None) -> Cla
     """
     Run the full classification pipeline on a single parsed document.
 
-    industry: user-provided industry label (e.g. "healthcare", "technology").
-              Used for pain point candidate generation. If None, generic
-              candidates are used. In the web UI this comes from a dropdown;
-              in the CLI it's --industry.
-
-    Pipelines run in dependency order:
-      1. document_type    (no deps)
-      2. pain_points      (needs industry)
-      3. confidentiality  (no deps)
-      4. importance       (needs pain_points + confidentiality)
+    Dependency order:
+      Parallel: doc_type, pain_points, confidentiality, summary
+      Sequential after above: importance (needs pain_points + confidentiality)
     """
     filename = path.name
 
-    # 1. Document type
-    doc_type_label, doc_type_prob = classify_document_type(text)
+    # Run independent pipelines in parallel
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        f_doc_type      = pool.submit(classify_document_type, text)
+        f_pain_points   = pool.submit(detect_pain_points, text, industry or "general")
+        f_confidential  = pool.submit(classify_confidentiality, text)
+        f_summary       = pool.submit(summarize_document, text)
+
+        doc_type_label, doc_type_prob = f_doc_type.result()
+        pain_point_dicts = f_pain_points.result()
+        confidentiality_dict = f_confidential.result()
+        summary = f_summary.result()
+
     logger.debug(f"{filename}: doc_type={doc_type_label} ({doc_type_prob:.2f})")
-
-    # 2. Pain points (uses user-supplied industry for candidate generation)
-    pain_point_dicts = detect_pain_points(text, industry=industry or "general")
     logger.debug(f"{filename}: pain_points={[p['label'] for p in pain_point_dicts]}")
+    logger.debug(f"{filename}: confidentiality={confidentiality_dict['label']} (confidence={confidentiality_dict['confidence']:.2f})")
 
-    # 3. Confidentiality
-    confidentiality_dict = classify_confidentiality(text)
-    logger.debug(
-        f"{filename}: confidentiality={confidentiality_dict['label']} "
-        f"(confidence={confidentiality_dict['confidence']:.2f})"
-    )
-
-    # 4. Importance (pain points + confidentiality are explicit inputs)
+    # Importance depends on pain_points + confidentiality
     importance_dict = classify_importance(
         text,
         pain_points=pain_point_dicts,
         confidentiality_label=confidentiality_dict["label"],
     )
-    logger.debug(
-        f"{filename}: importance={importance_dict['label']} "
-        f"(confidence={importance_dict['confidence']:.2f}, "
-        f"needs_review={importance_dict['needs_review']})"
-    )
+    logger.debug(f"{filename}: importance={importance_dict['label']} (confidence={importance_dict['confidence']:.2f})")
 
     return ClassificationResult(
         filename=filename,
@@ -91,5 +83,6 @@ def classify_document(path: Path, text: str, industry: str | None = None) -> Cla
             confidence=round(importance_dict["confidence"], 4),
             needs_review=importance_dict["needs_review"],
         ),
+        summary=summary or None,
         classified_at=datetime.now(timezone.utc),
     )

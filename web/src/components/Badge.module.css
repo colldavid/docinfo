@@ -1,0 +1,21 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+
+.conf_public    { color: var(--conf-public);      background: rgba(16, 185, 129, 0.08); }
+.conf_sensitive { color: var(--conf-sensitive);   background: rgba(245, 158, 11, 0.08); }
+.conf_restricted{ color: var(--conf-restricted);  background: rgba(239, 68, 68, 0.08);  }
+
+.imp_high   { color: var(--imp-high);   background: rgba(167, 139, 250, 0.08); }
+.imp_medium { color: var(--imp-medium); background: rgba(96, 165, 250, 0.08);  }
+.imp_low    { color: var(--imp-low);    background: rgba(107, 114, 128, 0.08); }

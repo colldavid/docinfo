@@ -1,0 +1,205 @@
+.page { display: flex; flex-direction: column; gap: 2rem; }
+
+.heroText { padding-bottom: 0.5rem; }
+
+.accentLine { width: 36px; height: 2px; background: var(--accent); margin-bottom: 1rem; }
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.dropZone {
+  border: 2px dashed var(--border-accent);
+  padding: 4rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+  cursor: default;
+}
+.dropZone:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.dropMain {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: var(--text-primary);
+}
+
+.dropSub {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.dropActions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
+
+.dropBtn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 0.5rem 1.25rem;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.dropBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+.hidden { display: none; }
+
+.fileList {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+}
+
+.fileCount {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  margin-right: 0.25rem;
+}
+
+.filePills { display: flex; flex-wrap: wrap; gap: 0.35rem; flex: 1; }
+
+.pill {
+  font-size: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 0.15rem 0.5rem;
+  border-radius: 2px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pillMore {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 0.15rem 0.25rem;
+}
+
+.clearBtn {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-left: auto;
+  transition: color var(--transition-fast);
+}
+.clearBtn:hover { color: var(--text-secondary); }
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.selectWrap { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.selectLabel {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.select {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 2px;
+  cursor: pointer;
+  appearance: none;
+  min-width: 160px;
+  transition: border-color var(--transition-fast);
+}
+.select:focus, .select:hover { border-color: var(--accent); outline: none; }
+
+.classifyBtn {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0.55rem 1.75rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+.classifyBtn:hover:not(:disabled) { opacity: 0.85; }
+.classifyBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.error {
+  background: var(--error-bg);
+  border: 1px solid var(--error);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--error);
+  border-radius: 2px;
+}
+
+.results { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.tableHint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.detailCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.detailFilename {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--text-primary);
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
