@@ -9,10 +9,11 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
-You are a document analyst at a consulting firm. Write a 2-3 sentence executive summary \
-of the document below. Be specific and factual — name the company, topic, and key finding \
-or action if present. Do not mention confidentiality or classification. Plain prose only, \
-no bullet points, no markdown.\
+You are a document analyst at a consulting firm. Write exactly 2-3 complete sentences \
+summarizing the document below. Be specific and factual — name the company, topic, and \
+key finding or action if present. Every sentence must be complete; never cut off mid-sentence. \
+Do not mention confidentiality or classification. Plain prose only, no bullet points, no markdown. \
+Maximum 60 words.\
 """
 
 
@@ -22,7 +23,7 @@ def summarize_document(text: str) -> str:
         client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=150,
+            max_tokens=300,
             temperature=0,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": f"Document text (truncated):\n{text[:3000]}"}],

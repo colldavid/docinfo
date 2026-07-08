@@ -26,3 +26,8 @@ export async function fetchNeedsReview(): Promise<ClassificationRecord[]> {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function clearHistory(): Promise<void> {
+  const res = await fetch(`${BASE}/results`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}

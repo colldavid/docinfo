@@ -3,7 +3,13 @@ import { ConfidentialityBadge, ImportanceBadge } from "./Badge";
 import styles from "./ResultDetail.module.css";
 
 export function ResultDetail({ record }: { record: ClassificationRecord }) {
-  const needsReview = record.confidentiality?.needs_review || record.importance_level?.needs_review;
+  const flaggedDimensions = [
+    record.document_type?.needs_review && "doc type",
+    record.industry?.needs_review && "industry",
+    record.confidentiality?.needs_review && "confidentiality",
+    record.importance_level?.needs_review && "importance",
+  ].filter(Boolean);
+  const needsReview = flaggedDimensions.length > 0;
 
   return (
     <div className={styles.wrapper}>
@@ -18,27 +24,14 @@ export function ResultDetail({ record }: { record: ClassificationRecord }) {
         <div className={styles.reviewBanner}>
           <span className={styles.reviewIcon}>⚠</span>
           <span>
-            Flagged for human review — pipeline had low confidence
-            {record.confidentiality?.needs_review && record.importance_level?.needs_review
-              ? " on confidentiality and importance"
-              : record.confidentiality?.needs_review
-              ? " on confidentiality"
-              : " on importance"}
-            .
+            Flagged for human review — low confidence on {flaggedDimensions.join(" and ")}.
           </span>
         </div>
       )}
 
       {/* Classification grid */}
       <div className={styles.grid}>
-        <StatCard label="Doc Type" value={record.document_type?.label ?? "—"}>
-          {record.document_type && (
-            <ConfBar value={record.document_type.probability} color="var(--accent)" />
-          )}
-          {record.document_type && (
-            <span className={styles.subtext}>{(record.document_type.probability * 100).toFixed(0)}% confidence</span>
-          )}
-        </StatCard>
+        <StatCard label="Doc Type" value={record.document_type?.label ?? "—"} />
 
         <StatCard label="Confidentiality" value="">
           {record.confidentiality
@@ -64,7 +57,13 @@ export function ResultDetail({ record }: { record: ClassificationRecord }) {
           )}
         </StatCard>
 
-        <StatCard label="Industry" value={record.industry ?? "—"} />
+        <StatCard label="Industry" value={record.industry?.label ?? "—"}>
+          {record.industry && (
+            <span className={styles.subtext}>
+              {record.industry.user_provided ? "user-provided" : "auto-detected"}
+            </span>
+          )}
+        </StatCard>
       </div>
 
       {/* Pain points */}

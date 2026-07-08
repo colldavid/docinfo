@@ -61,6 +61,21 @@
   gap: 1.25rem;
 }
 
+.clearBtn {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--error);
+  background: none;
+  border: 1px solid var(--error);
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s;
+}
+.clearBtn:hover { opacity: 1; }
+
 .detailFilename {
   font-family: var(--font-display);
   font-weight: 500;

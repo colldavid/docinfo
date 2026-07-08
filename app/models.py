@@ -6,10 +6,14 @@ from datetime import datetime
 class DocumentTypeResult(BaseModel):
     label: str
     probability: float  # real classifier output, not LLM self-report
+    needs_review: bool = False
 
 
-# Industry is user-provided (CLI --industry flag or web UI dropdown), not classified.
-# Kept as a plain optional string on ClassificationResult.
+class IndustryResult(BaseModel):
+    label: str
+    probability: float
+    needs_review: bool = False
+    user_provided: bool = False
 
 
 class PainPoint(BaseModel):
@@ -34,7 +38,7 @@ class ImportanceResult(BaseModel):
 class ClassificationResult(BaseModel):
     filename: str
     document_type: Optional[DocumentTypeResult] = None
-    industry: Optional[str] = None  # user-provided, not classified
+    industry: Optional["IndustryResult"] = None
     pain_points: list[PainPoint] = []
     confidentiality: Optional[ConfidentialityResult] = None
     importance_level: Optional[ImportanceResult] = None

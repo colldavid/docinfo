@@ -29,9 +29,13 @@ class ClassificationRecord(Base):
     # Document type
     doc_type_label = Column(String)
     doc_type_probability = Column(Float)
+    doc_type_needs_review = Column(Boolean, default=False)
 
-    # Industry (user-provided)
+    # Industry (classifier-detected or user-provided)
     industry = Column(String)
+    industry_probability = Column(Float)
+    industry_needs_review = Column(Boolean, default=False)
+    industry_user_provided = Column(Boolean, default=False)
 
     # Pain points — stored as JSON array of {label, similarity_score}
     pain_points_json = Column(Text, default="[]")

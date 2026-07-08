@@ -62,8 +62,14 @@ def _record_to_dict(r: ClassificationRecord) -> dict:
         "document_type": {
             "label": r.doc_type_label,
             "probability": r.doc_type_probability,
+            "needs_review": r.doc_type_needs_review,
         } if r.doc_type_label else None,
-        "industry": r.industry,
+        "industry": {
+            "label": r.industry,
+            "probability": r.industry_probability,
+            "needs_review": r.industry_needs_review,
+            "user_provided": r.industry_user_provided,
+        } if r.industry else None,
         "pain_points": r.pain_points,
         "confidentiality": {
             "label": r.confidentiality_label,
@@ -133,7 +139,11 @@ def _persist_record(result, session) -> ClassificationRecord:
         classified_at=result.classified_at,
         doc_type_label=result.document_type.label if result.document_type else None,
         doc_type_probability=result.document_type.probability if result.document_type else None,
-        industry=result.industry,
+        doc_type_needs_review=result.document_type.needs_review if result.document_type else False,
+        industry=result.industry.label if result.industry else None,
+        industry_probability=result.industry.probability if result.industry else None,
+        industry_needs_review=result.industry.needs_review if result.industry else False,
+        industry_user_provided=result.industry.user_provided if result.industry else False,
         pain_points=[
             {"label": p.label, "similarity_score": p.similarity_score}
             for p in result.pain_points
@@ -212,6 +222,8 @@ def list_needs_review(limit: int = 50, offset: int = 0):
             .filter(
                 (ClassificationRecord.confidentiality_needs_review == True)
                 | (ClassificationRecord.importance_needs_review == True)
+                | (ClassificationRecord.doc_type_needs_review == True)
+                | (ClassificationRecord.industry_needs_review == True)
             )
             .order_by(ClassificationRecord.classified_at.desc())
             .offset(offset)
@@ -233,6 +245,15 @@ def list_results(limit: int = 50, offset: int = 0):
             .all()
         )
         return [_record_to_dict(r) for r in records]
+
+
+@app.delete("/results")
+def clear_results():
+    """Delete all classification results."""
+    with get_session() as session:
+        session.query(ClassificationRecord).delete()
+        session.commit()
+    return {"deleted": True}
 
 
 @app.get("/results/{result_id}")

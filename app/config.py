@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     consistency_check_runs: int = 3
     consistency_check_temperature: float = 0.4
 
+    # Classifier needs_review thresholds (lower = only flag truly uncertain)
+    doc_type_review_threshold: float = 0.5
+    industry_review_threshold: float = 0.3
+
     # Paths — resolved relative to project root so CLI works from any directory
     model_dir: Path = Field(default=_PROJECT_ROOT / "model")
     cache_dir: Path = Field(default=_PROJECT_ROOT / "cache")

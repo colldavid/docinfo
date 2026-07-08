@@ -16,7 +16,7 @@ const col = createColumnHelper<ClassificationRecord>();
 const COLUMNS = [
   col.accessor("filename", { header: "File" }),
   col.accessor((r) => r.document_type?.label ?? "—", { id: "doc_type", header: "Doc Type" }),
-  col.accessor("industry", { header: "Industry", cell: (i) => i.getValue() ?? "—" }),
+  col.accessor((r) => r.industry?.label ?? "—", { id: "industry", header: "Industry" }),
   col.accessor((r) => r.confidentiality?.label ?? "—", {
     id: "confidentiality",
     header: "Confidentiality",
@@ -28,7 +28,7 @@ const COLUMNS = [
     cell: (i) => { const v = i.getValue(); return v !== "—" ? <ImportanceBadge label={v} /> : <span className={styles.dash}>—</span>; },
   }),
   col.accessor(
-    (r) => r.confidentiality?.needs_review || r.importance_level?.needs_review ? "yes" : "no",
+    (r) => r.confidentiality?.needs_review || r.importance_level?.needs_review || r.document_type?.needs_review || r.industry?.needs_review ? "yes" : "no",
     { id: "needs_review", header: "Review", cell: (i) => i.getValue() === "yes" ? <span className={styles.flagged}>⚠ yes</span> : <span className={styles.dash}>—</span> }
   ),
   col.accessor((r) => r.classified_at.replace("T", " ").slice(0, 16), { id: "classified_at", header: "Classified At" }),

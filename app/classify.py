@@ -10,14 +10,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.config import settings
 from app.models import (
     ClassificationResult,
     ConfidentialityResult,
     DocumentTypeResult,
     ImportanceResult,
+    IndustryResult,
     PainPoint,
 )
-from app.pipelines.classifier import classify_document_type
+from app.pipelines.classifier import classify_document_type, classify_industry
 from app.pipelines.pain_points import detect_pain_points
 from app.pipelines.confidentiality import classify_confidentiality
 from app.pipelines.importance import classify_importance
@@ -31,22 +33,41 @@ def classify_document(path: Path, text: str, industry: str | None = None) -> Cla
     Run the full classification pipeline on a single parsed document.
 
     Dependency order:
-      Parallel: doc_type, pain_points, confidentiality, summary
+      Parallel: doc_type, industry, pain_points, confidentiality, summary
       Sequential after above: importance (needs pain_points + confidentiality)
     """
     filename = path.name
 
     # Run independent pipelines in parallel
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        f_doc_type      = pool.submit(classify_document_type, text)
-        f_pain_points   = pool.submit(detect_pain_points, text, industry or "general")
-        f_confidential  = pool.submit(classify_confidentiality, text)
-        f_summary       = pool.submit(summarize_document, text)
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        f_doc_type     = pool.submit(classify_document_type, text)
+        f_industry     = None if industry else pool.submit(classify_industry, text)
+        f_pain_points  = pool.submit(detect_pain_points, text, industry or "general")
+        f_confidential = pool.submit(classify_confidentiality, text)
+        f_summary      = pool.submit(summarize_document, text)
 
         doc_type_label, doc_type_prob = f_doc_type.result()
         pain_point_dicts = f_pain_points.result()
         confidentiality_dict = f_confidential.result()
         summary = f_summary.result()
+
+        if f_industry is not None:
+            industry_labels, industry_probs = f_industry.result()
+            industry_result = IndustryResult(
+                label=industry_labels[0],
+                probability=round(industry_probs[0], 4),
+                needs_review=industry_probs[0] < settings.industry_review_threshold,
+                user_provided=False,
+            )
+        else:
+            industry_result = IndustryResult(
+                label=industry,
+                probability=1.0,
+                needs_review=False,
+                user_provided=True,
+            )
+
+    doc_type_needs_review = doc_type_prob < settings.doc_type_review_threshold
 
     logger.debug(f"{filename}: doc_type={doc_type_label} ({doc_type_prob:.2f})")
     logger.debug(f"{filename}: pain_points={[p['label'] for p in pain_point_dicts]}")
@@ -65,8 +86,9 @@ def classify_document(path: Path, text: str, industry: str | None = None) -> Cla
         document_type=DocumentTypeResult(
             label=doc_type_label,
             probability=round(doc_type_prob, 4),
+            needs_review=doc_type_needs_review,
         ),
-        industry=industry,
+        industry=industry_result,
         pain_points=[
             PainPoint(label=p["label"], similarity_score=p["similarity_score"])
             for p in pain_point_dicts
