@@ -4,8 +4,8 @@ Uses SQLite by default (DATABASE_URL in .env.local to override).
 """
 import json
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, Column, String, Float, Boolean, DateTime, Text, Integer
-from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy import create_engine, Column, String, Float, Boolean, DateTime, Text, Integer, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Session, relationship
 
 from app.config import settings
 
@@ -17,6 +17,16 @@ engine = create_engine(
 
 class Base(DeclarativeBase):
     pass
+
+
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    theme = Column(Text)  # Haiku-synthesized cross-doc theme
+    records = relationship("ClassificationRecord", back_populates="portfolio")
 
 
 class ClassificationRecord(Base):
@@ -56,6 +66,10 @@ class ClassificationRecord(Base):
     summary = Column(Text)
 
     error = Column(Text)
+
+    # Portfolio association
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=True)
+    portfolio = relationship("Portfolio", back_populates="records")
 
     @property
     def pain_points(self) -> list[dict]:

@@ -41,4 +41,14 @@ export interface ClassificationRecord {
   importance_level: ImportanceResult | null;
   summary: string | null;
   error: string | null;
+  portfolio_id?: number | null;
+}
+
+export interface Portfolio {
+  id: number;
+  name: string;
+  created_at: string;
+  theme: string | null;
+  record_count: number;
+  records?: ClassificationRecord[];
 }

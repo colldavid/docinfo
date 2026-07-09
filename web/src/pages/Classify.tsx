@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
-import { classifyBatch } from "../api";
-import type { ClassificationRecord } from "../types";
+import { classifyBatch, createPortfolio, exportCsvUrl } from "../api";
+import type { ClassificationRecord, Portfolio } from "../types";
 import { BatchSummary } from "../components/BatchSummary";
 import { ResultsTable } from "../components/ResultsTable";
 import { ResultDetail } from "../components/ResultDetail";
+import { PortfolioView } from "../components/PortfolioView";
 import styles from "./Classify.module.css";
 
 const INDUSTRIES = [
@@ -24,6 +25,9 @@ export function Classify() {
   const [results, setResults] = useState<ClassificationRecord[]>([]);
   const [selected, setSelected] = useState<ClassificationRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [portfolioName, setPortfolioName] = useState("");
+  const [savedPortfolio, setSavedPortfolio] = useState<Portfolio | null>(null);
+  const [savingPortfolio, setSavingPortfolio] = useState(false);
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return;
@@ -31,6 +35,21 @@ export function Classify() {
     setFiles(valid);
     setResults([]);
     setSelected(null);
+    setSavedPortfolio(null);
+  }
+
+  async function handleSavePortfolio() {
+    if (!portfolioName.trim() || !results.length) return;
+    setSavingPortfolio(true);
+    try {
+      const ids = results.map((r) => r.id).filter(Boolean) as number[];
+      const p = await createPortfolio(portfolioName.trim(), ids);
+      setSavedPortfolio({ ...p, records: results });
+    } catch (e) {
+      alert("Failed to save portfolio: " + (e instanceof Error ? e.message : e));
+    } finally {
+      setSavingPortfolio(false);
+    }
   }
 
   function onDrop(e: React.DragEvent) {
@@ -117,25 +136,49 @@ export function Classify() {
 
       {results.length > 0 && (
         <div className={styles.results}>
-          {results.length > 1 && <BatchSummary records={results} />}
-
-          {results.length > 1 && (
-            <p className={styles.tableHint}>Click a row to see full details below.</p>
+          {/* Save as portfolio */}
+          {!savedPortfolio && (
+            <div className={styles.savePortfolio}>
+              <input
+                className={styles.portfolioInput}
+                placeholder="Portfolio name…"
+                value={portfolioName}
+                onChange={(e) => setPortfolioName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSavePortfolio()}
+              />
+              <button
+                className={styles.savePortfolioBtn}
+                onClick={handleSavePortfolio}
+                disabled={!portfolioName.trim() || savingPortfolio}
+              >
+                {savingPortfolio ? "Saving…" : "Save as Portfolio"}
+              </button>
+              <a href={exportCsvUrl()} download className={styles.exportBtn}>Export CSV</a>
+            </div>
           )}
 
-          {results.length === 1 ? (
-            <div className={styles.detailCard}>
-              <p className={styles.detailFilename}>{results[0].filename}</p>
-              <ResultDetail record={results[0]} />
-            </div>
+          {/* Portfolio view if saved */}
+          {savedPortfolio ? (
+            <PortfolioView portfolio={savedPortfolio} records={results} />
           ) : (
             <>
-              <ResultsTable records={results} onSelect={setSelected} selectedId={selected?.id} />
-              {selected && (
+              {results.length > 1 && <BatchSummary records={results} />}
+              {results.length > 1 && <p className={styles.tableHint}>Click a row to see full details below.</p>}
+              {results.length === 1 ? (
                 <div className={styles.detailCard}>
-                  <p className={styles.detailFilename}>{selected.filename}</p>
-                  <ResultDetail record={selected} />
+                  <p className={styles.detailFilename}>{results[0].filename}</p>
+                  <ResultDetail record={results[0]} />
                 </div>
+              ) : (
+                <>
+                  <ResultsTable records={results} onSelect={setSelected} selectedId={selected?.id} />
+                  {selected && (
+                    <div className={styles.detailCard}>
+                      <p className={styles.detailFilename}>{selected.filename}</p>
+                      <ResultDetail record={selected} />
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

@@ -61,6 +61,74 @@
   gap: 1.25rem;
 }
 
+.portfolioList { display: flex; flex-direction: column; gap: 0; }
+
+.portfolioRow {
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+}
+.portfolioRow:last-child { border-bottom: 1px solid var(--border-subtle); }
+.portfolioRowActive { border-color: var(--accent); }
+
+.portfolioRowBtn {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.9rem 1.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  gap: 1rem;
+}
+.portfolioRowBtn:hover { background: var(--bg-card); }
+
+.portfolioRowName {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.portfolioRowMeta { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+
+.portfolioDetail { padding: 1.5rem; border-top: 1px solid var(--border-subtle); }
+
+.historyToolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 0.45rem 0.75rem;
+  flex: 1;
+  min-width: 220px;
+  transition: border-color 0.15s;
+}
+.searchInput:focus { outline: none; border-color: var(--accent); }
+.searchInput::placeholder { color: var(--text-muted); }
+
+.toolbarBtn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 0.4rem 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.toolbarBtn:hover { opacity: 0.75; }
+
 .clearBtn {
   align-self: flex-start;
   font-family: var(--font-mono);

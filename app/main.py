@@ -8,20 +8,25 @@ Endpoints:
   GET  /health            Liveness check
 """
 import asyncio
+import csv
+import io
 import json
 import logging
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import or_
 
 from app.classify import classify_document
-from app.database import ClassificationRecord, get_session, init_db
+from app.database import ClassificationRecord, Portfolio, get_session, init_db
 from app.ingestion import parse_document
+from app.pipelines.theme import synthesize_theme
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +261,70 @@ def clear_results():
     return {"deleted": True}
 
 
+@app.get("/search")
+def search(q: str, limit: int = 50):
+    """Search filenames and summaries."""
+    with get_session() as session:
+        records = (
+            session.query(ClassificationRecord)
+            .filter(or_(
+                ClassificationRecord.filename.ilike(f"%{q}%"),
+                ClassificationRecord.summary.ilike(f"%{q}%"),
+            ))
+            .order_by(ClassificationRecord.classified_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [_record_to_dict(r) for r in records]
+
+
+@app.get("/results/export")
+def export_csv(portfolio_id: Optional[int] = None):
+    """Export classification results as CSV. Optionally filter by portfolio."""
+    with get_session() as session:
+        q = session.query(ClassificationRecord).order_by(ClassificationRecord.classified_at.desc())
+        if portfolio_id is not None:
+            q = q.filter(ClassificationRecord.portfolio_id == portfolio_id)
+        records = q.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "filename", "classified_at", "doc_type", "industry", "industry_source",
+        "confidentiality", "confidentiality_confidence",
+        "importance", "importance_confidence",
+        "needs_review", "pain_points", "summary",
+    ])
+    for r in records:
+        pain_labels = ", ".join(p["label"] for p in json.loads(r.pain_points_json or "[]"))
+        needs_review = any([
+            r.doc_type_needs_review, r.industry_needs_review,
+            r.confidentiality_needs_review, r.importance_needs_review,
+        ])
+        writer.writerow([
+            r.filename,
+            r.classified_at.isoformat() if r.classified_at else "",
+            r.doc_type_label or "",
+            r.industry or "",
+            "user" if r.industry_user_provided else "auto",
+            r.confidentiality_label or "",
+            f"{r.confidentiality_confidence:.2f}" if r.confidentiality_confidence else "",
+            r.importance_label or "",
+            f"{r.importance_confidence:.2f}" if r.importance_confidence else "",
+            "yes" if needs_review else "no",
+            pain_labels,
+            (r.summary or "").replace("\n", " "),
+        ])
+
+    output.seek(0)
+    filename = f"docinfo_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @app.get("/results/{result_id}")
 def get_result(result_id: int):
     """Fetch a single classification result by ID."""
@@ -264,6 +333,95 @@ def get_result(result_id: int):
         if not record:
             raise HTTPException(status_code=404, detail=f"Result {result_id} not found.")
         return _record_to_dict(record)
+
+
+# ---------------------------------------------------------------------------
+# Portfolio endpoints
+# ---------------------------------------------------------------------------
+
+def _portfolio_to_dict(p: Portfolio, include_records: bool = False) -> dict:
+    d = {
+        "id": p.id,
+        "name": p.name,
+        "created_at": p.created_at.isoformat(),
+        "theme": p.theme,
+        "record_count": len(p.records),
+    }
+    if include_records:
+        d["records"] = [_record_to_dict(r) for r in p.records]
+    return d
+
+
+@app.post("/portfolios", status_code=201)
+def create_portfolio(body: dict):
+    """
+    Create a portfolio from a list of classification record IDs.
+    Body: { "name": str, "record_ids": [int] }
+    """
+    name = body.get("name", "").strip()
+    record_ids = body.get("record_ids", [])
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    if not record_ids:
+        raise HTTPException(status_code=422, detail="record_ids must be non-empty")
+
+    with get_session() as session:
+        records = session.query(ClassificationRecord).filter(
+            ClassificationRecord.id.in_(record_ids)
+        ).all()
+        if not records:
+            raise HTTPException(status_code=404, detail="No matching records found")
+
+        summaries = [r.summary for r in records if r.summary]
+        theme = synthesize_theme(summaries)
+
+        portfolio = Portfolio(
+            name=name,
+            created_at=datetime.now(timezone.utc),
+            theme=theme,
+        )
+        session.add(portfolio)
+        session.flush()
+
+        for r in records:
+            r.portfolio_id = portfolio.id
+
+        session.commit()
+        session.refresh(portfolio)
+        return JSONResponse(status_code=201, content=_portfolio_to_dict(portfolio, include_records=True))
+
+
+@app.get("/portfolios")
+def list_portfolios():
+    with get_session() as session:
+        portfolios = (
+            session.query(Portfolio)
+            .order_by(Portfolio.created_at.desc())
+            .all()
+        )
+        return [_portfolio_to_dict(p) for p in portfolios]
+
+
+@app.get("/portfolios/{portfolio_id}")
+def get_portfolio(portfolio_id: int):
+    with get_session() as session:
+        p = session.get(Portfolio, portfolio_id)
+        if not p:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        return _portfolio_to_dict(p, include_records=True)
+
+
+@app.delete("/portfolios/{portfolio_id}")
+def delete_portfolio(portfolio_id: int):
+    with get_session() as session:
+        p = session.get(Portfolio, portfolio_id)
+        if not p:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+        for r in p.records:
+            r.portfolio_id = None
+        session.delete(p)
+        session.commit()
+    return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------

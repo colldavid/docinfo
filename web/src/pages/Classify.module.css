@@ -179,6 +179,58 @@
 
 .results { display: flex; flex-direction: column; gap: 1.5rem; }
 
+.savePortfolio {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+}
+
+.portfolioInput {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 0.45rem 0.75rem;
+  flex: 1;
+  min-width: 180px;
+  transition: border-color var(--transition-fast);
+}
+.portfolioInput:focus { outline: none; border-color: var(--accent); }
+.portfolioInput::placeholder { color: var(--text-muted); }
+
+.savePortfolioBtn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+  white-space: nowrap;
+}
+.savePortfolioBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.savePortfolioBtn:hover:not(:disabled) { opacity: 0.85; }
+
+.exportBtn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 0.45rem 1rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity var(--transition-fast);
+}
+.exportBtn:hover { opacity: 0.75; }
+
 .tableHint {
   font-size: 0.75rem;
   color: var(--text-muted);

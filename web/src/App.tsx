@@ -2,13 +2,15 @@ import { useState } from "react";
 import { Classify } from "./pages/Classify";
 import { History } from "./pages/History";
 import { NeedsReview } from "./pages/NeedsReview";
+import { Portfolios } from "./pages/Portfolios";
 import styles from "./App.module.css";
 
-type Page = "classify" | "history" | "review";
+type Page = "classify" | "history" | "portfolios" | "review";
 
 const NAV: { id: Page; label: string }[] = [
   { id: "classify", label: "Classify" },
   { id: "history", label: "History" },
+  { id: "portfolios", label: "Portfolios" },
   { id: "review", label: "Needs Review" },
 ];
 
@@ -36,6 +38,7 @@ function App() {
         <div className={styles.content}>
           {page === "classify" && <Classify />}
           {page === "history" && <History />}
+          {page === "portfolios" && <Portfolios />}
           {page === "review" && <NeedsReview />}
         </div>
       </main>
