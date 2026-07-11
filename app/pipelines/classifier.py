@@ -32,28 +32,45 @@ class LogisticClassifier:
         self.model = joblib.load(model_path)
         self.encoder = joblib.load(encoder_path)
 
+    def _rescale(self, proba: np.ndarray) -> np.ndarray:
+        """
+        Rescale raw LR probabilities to [0, 1] relative confidence.
+
+        Raw LR probabilities are diluted by the number of classes — with 16
+        industry classes, even a correct high-confidence prediction may have
+        raw prob ~0.25. We rescale so that uniform random (1/n) maps to 0
+        and perfect certainty maps to 1, giving an intuitive confidence signal.
+
+        Formula: (p - 1/n) / (1 - 1/n), clipped to [0, 1].
+        """
+        n = len(proba)
+        floor = 1.0 / n
+        rescaled = (proba - floor) / (1.0 - floor)
+        return np.clip(rescaled, 0.0, 1.0)
+
     def predict(self, text: str) -> tuple[str, float]:
         """
-        Returns (top_label, probability) for the highest-confidence class.
-        probability is a real calibrated probability from the LR classifier.
+        Returns (top_label, rescaled_confidence) for the highest-confidence class.
+        Confidence is rescaled so 0 = random guess, 1 = certain.
         """
         vec = embed_one(text).reshape(1, -1)
         proba = self.model.predict_proba(vec)[0]
+        rescaled = self._rescale(proba)
         top_idx = int(np.argmax(proba))
         label = self.encoder.inverse_transform([top_idx])[0]
-        return label, float(proba[top_idx])
+        return label, float(rescaled[top_idx])
 
     def predict_multi(
-        self, text: str, threshold: float = 0.3
+        self, text: str, threshold: float = 0.1
     ) -> tuple[list[str], list[float]]:
         """
-        Multi-label variant: return all labels with probability >= threshold.
-        Used for industry classification (a doc can span multiple sectors).
-        Always returns at least the top label even if below threshold.
+        Multi-label variant: return all labels with rescaled confidence >= threshold.
+        Always returns at least the top label.
         """
         vec = embed_one(text).reshape(1, -1)
         proba = self.model.predict_proba(vec)[0]
-        pairs = sorted(enumerate(proba), key=lambda x: x[1], reverse=True)
+        rescaled = self._rescale(proba)
+        pairs = sorted(enumerate(rescaled), key=lambda x: x[1], reverse=True)
 
         labels, scores = [], []
         for idx, score in pairs:

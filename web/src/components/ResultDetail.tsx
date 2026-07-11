@@ -74,10 +74,6 @@ export function ResultDetail({ record }: { record: ClassificationRecord }) {
             {record.pain_points.map((pp) => (
               <div key={pp.label} className={styles.painPoint}>
                 <span className={styles.ppLabel}>{pp.label}</span>
-                <div className={styles.bar}>
-                  <div className={styles.barFill} style={{ width: `${pp.similarity_score * 100}%` }} />
-                </div>
-                <span className={styles.ppScore}>{(pp.similarity_score * 100).toFixed(0)}%</span>
               </div>
             ))}
           </div>

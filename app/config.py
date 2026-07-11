@@ -16,16 +16,16 @@ class Settings(BaseSettings):
     embedding_model: str = "all-MiniLM-L6-v2"
 
     # Pain point matching threshold (cosine similarity)
-    pain_point_threshold: float = 0.65
+    pain_point_threshold: float = 0.40
 
     # Consistency check: re-run count when importance confidence < threshold
     consistency_check_confidence_threshold: float = 0.7
     consistency_check_runs: int = 3
     consistency_check_temperature: float = 0.4
 
-    # Classifier needs_review thresholds (lower = only flag truly uncertain)
-    doc_type_review_threshold: float = 0.5
-    industry_review_threshold: float = 0.3
+    # Classifier needs_review thresholds — applied to rescaled confidence (0=random, 1=certain)
+    doc_type_review_threshold: float = 0.20
+    industry_review_threshold: float = 0.15
 
     # Paths — resolved relative to project root so CLI works from any directory
     model_dir: Path = Field(default=_PROJECT_ROOT / "model")
