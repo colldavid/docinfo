@@ -55,6 +55,19 @@
   border-bottom-color: var(--accent);
 }
 
+.signOut {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+  padding: 0;
+}
+.signOut:hover { color: var(--text-secondary); }
+
 .main {
   flex: 1;
 }

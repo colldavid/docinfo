@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     database_url: str = "sqlite:///local.db"
 
+    # Single-user auth — set these in .env.local
+    auth_username: str = "docinfo"
+    auth_password: str = "docinfo"
+    session_secret: str = "change-me-in-production"
+
     # Embedding model — swap here if upgrading
     embedding_model: str = "all-MiniLM-L6-v2"
 
