@@ -3,15 +3,17 @@ import { Classify } from "./pages/Classify";
 import { History } from "./pages/History";
 import { NeedsReview } from "./pages/NeedsReview";
 import { Portfolios } from "./pages/Portfolios";
+import { About } from "./pages/About";
 import styles from "./App.module.css";
 
-type Page = "classify" | "history" | "portfolios" | "review";
+type Page = "classify" | "history" | "portfolios" | "review" | "about";
 
 const NAV: { id: Page; label: string }[] = [
   { id: "classify", label: "Classify" },
   { id: "history", label: "History" },
   { id: "portfolios", label: "Portfolios" },
   { id: "review", label: "Needs Review" },
+  { id: "about", label: "How it Works" },
 ];
 
 function App() {
@@ -36,10 +38,11 @@ function App() {
 
       <main className={styles.main}>
         <div className={styles.content}>
-          {page === "classify" && <Classify />}
+          {page === "classify" && <Classify onShowAbout={() => setPage("about")} />}
           {page === "history" && <History />}
           {page === "portfolios" && <Portfolios />}
           {page === "review" && <NeedsReview />}
+          {page === "about" && <About />}
         </div>
       </main>
     </div>

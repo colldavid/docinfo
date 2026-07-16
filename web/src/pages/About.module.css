@@ -1,0 +1,174 @@
+.page { display: flex; flex-direction: column; gap: 3rem; }
+
+.hero { display: flex; flex-direction: column; gap: 0; padding-bottom: 0.5rem; }
+.accentLine { width: 36px; height: 2px; background: var(--accent); margin-bottom: 1rem; }
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+.subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  max-width: 680px;
+  line-height: 1.7;
+}
+
+/* Stats bar */
+.statsBar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-card);
+}
+.statValue {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Sections */
+.section { display: flex; flex-direction: column; gap: 1.5rem; }
+.sectionTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.4rem;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Pipeline */
+.pipeline { display: flex; flex-direction: column; }
+.step { display: flex; gap: 1.5rem; }
+.stepLeft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 36px;
+  flex-shrink: 0;
+}
+.stepNum {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent);
+  background: var(--accent-dim);
+  flex-shrink: 0;
+}
+.stepLine {
+  width: 1px;
+  flex: 1;
+  min-height: 1.5rem;
+  background: var(--border-subtle);
+  margin: 4px 0;
+}
+.stepRight { padding: 0.4rem 0 1.75rem; }
+.stepLabel {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+}
+.stepDesc { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6; max-width: 560px; }
+
+/* Comparison table */
+.table { display: flex; flex-direction: column; border: 1px solid var(--border-subtle); }
+.tableHeader {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.tableHeader span {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 0.6rem 1rem;
+}
+.tableRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.tableRow:last-child { border-bottom: none; }
+.tableRowHighlight { background: var(--accent-dim); }
+.tableRow span {
+  font-size: 0.85rem;
+  padding: 0.85rem 1rem;
+  line-height: 1.5;
+  border-right: 1px solid var(--border-subtle);
+}
+.tableRow span:last-child { border-right: none; }
+.colDimension { color: var(--text-primary); font-weight: 500; }
+.colManual { color: var(--text-muted); }
+.colDocinfo { color: var(--accent); }
+
+/* Tech grid */
+.techGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+}
+.techCard {
+  background: var(--bg-card);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.techLabel {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.techValue {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+.techNote { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .statsBar { grid-template-columns: repeat(2, 1fr); }
+  .techGrid { grid-template-columns: 1fr; }
+  .tableHeader, .tableRow { grid-template-columns: 1fr; }
+  .tableHeader span:first-child, .tableRow span.colDimension { display: none; }
+}

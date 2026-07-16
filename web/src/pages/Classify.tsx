@@ -57,7 +57,7 @@ const INDUSTRIES = [
 const SUPPORTED = [".pdf", ".docx", ".txt"];
 const isSupported = (f: File) => SUPPORTED.some((ext) => f.name.toLowerCase().endsWith(ext));
 
-export function Classify() {
+export function Classify({ onShowAbout }: { onShowAbout?: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -148,7 +148,14 @@ export function Classify() {
       <div className={styles.heroText}>
         <div className={styles.accentLine} />
         <h1 className={styles.title}>Classify Documents</h1>
-        <p className={styles.subtitle}>Upload files or a folder to run the full intelligence pipeline.</p>
+        <p className={styles.subtitle}>
+          Upload files or a folder to run the full intelligence pipeline.
+          {onShowAbout && (
+            <button className={styles.howItWorksLink} onClick={onShowAbout}>
+              See how it works →
+            </button>
+          )}
+        </p>
       </div>
 
       {/* Drop zone */}
