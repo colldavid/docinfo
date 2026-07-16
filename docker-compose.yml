@@ -4,12 +4,13 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      # .env.local is gitignored — copy .env.example and fill in your values.
-      # Secrets are mounted at runtime, never baked into the image.
+      # Copy .env.example → .env.local and fill in ANTHROPIC_API_KEY
       - .env.local
     volumes:
-      # SQLite database file lives on the host, persists across container restarts.
-      # for production, swap SQLite volume for RDS PostgreSQL via DATABASE_URL environment variable
-      - ./local.db:/app/local.db
-      # Mount document folder for classification (optional — can also pass via CLI)
-      - ./documents:/app/documents
+      # SQLite db persists across restarts; swap DATABASE_URL for RDS in prod
+      - docinfo-data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/local.db
+
+volumes:
+  docinfo-data:

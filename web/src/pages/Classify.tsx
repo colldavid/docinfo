@@ -1,11 +1,52 @@
-import { useRef, useState } from "react";
-import { classifyBatch, createPortfolio, exportCsvUrl } from "../api";
+import { useRef, useState, useEffect } from "react";
+import { classifyOne, createPortfolio, exportCsvUrl } from "../api";
 import type { ClassificationRecord, Portfolio } from "../types";
 import { BatchSummary } from "../components/BatchSummary";
 import { ResultsTable } from "../components/ResultsTable";
 import { ResultDetail } from "../components/ResultDetail";
 import { PortfolioView } from "../components/PortfolioView";
 import styles from "./Classify.module.css";
+
+// Estimated manual time per document in minutes (reading + noting key issues)
+const MANUAL_MINUTES_PER_DOC = 15;
+
+function ElapsedTimer({ startTime, fileCount }: { startTime: number; fileCount: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((Date.now() - startTime) / 1000), 250);
+    return () => clearInterval(id);
+  }, [startTime]);
+  return (
+    <div className={styles.elapsedBanner}>
+      <span className={styles.elapsedDot} />
+      Analyzing {fileCount} document{fileCount !== 1 ? "s" : ""}…
+      <span className={styles.elapsedTime}>{elapsed.toFixed(1)}s</span>
+    </div>
+  );
+}
+
+function TimeSavedBanner({ fileCount, elapsedSeconds, manualMinutes }: {
+  fileCount: number; elapsedSeconds: number; manualMinutes: number;
+}) {
+  const saved = manualMinutes - elapsedSeconds / 60;
+  const pct = Math.round((saved / manualMinutes) * 100);
+  const displayElapsed = elapsedSeconds < 60
+    ? `${elapsedSeconds.toFixed(1)}s`
+    : `${(elapsedSeconds / 60).toFixed(1)}m`;
+  return (
+    <div className={styles.timeSaved}>
+      <div className={styles.timeSavedMain}>
+        <span className={styles.timeSavedNum}>{pct}%</span>
+        <span className={styles.timeSavedLabel}>time saved</span>
+      </div>
+      <div className={styles.timeSavedDetail}>
+        DocInfo analyzed {fileCount} document{fileCount !== 1 ? "s" : ""} in{" "}
+        <strong>{displayElapsed}</strong> — estimated manual review time:{" "}
+        <strong>{manualMinutes >= 60 ? `${(manualMinutes / 60).toFixed(1)} hrs` : `${manualMinutes} min`}</strong>
+      </div>
+    </div>
+  );
+}
 
 const INDUSTRIES = [
   "technology", "healthcare", "finance", "energy", "retail",
@@ -28,6 +69,9 @@ export function Classify() {
   const [portfolioName, setPortfolioName] = useState("");
   const [savedPortfolio, setSavedPortfolio] = useState<Portfolio | null>(null);
   const [savingPortfolio, setSavingPortfolio] = useState(false);
+  const [classifyStartTime, setClassifyStartTime] = useState<number | null>(null);
+  const [classifyElapsed, setClassifyElapsed] = useState<number | null>(null);
+  const [fileStatuses, setFileStatuses] = useState<Record<string, "pending" | "done" | "error">>({});
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return;
@@ -61,10 +105,33 @@ export function Classify() {
     if (!files.length) return;
     setLoading(true);
     setError(null);
+    setClassifyElapsed(null);
+    setResults([]);
+    setSelected(null);
+    // Initialize all files as pending
+    const initialStatuses: Record<string, "pending" | "done" | "error"> = {};
+    for (const f of files) initialStatuses[f.name] = "pending";
+    setFileStatuses(initialStatuses);
+
+    const t0 = Date.now();
+    setClassifyStartTime(t0);
     try {
-      const res = await classifyBatch(files, industry || null);
-      setResults(res);
-      setSelected(null);
+      const settled = await Promise.all(
+        files.map(async (f) => {
+          try {
+            const r = await classifyOne(f, industry || null);
+            setFileStatuses((prev) => ({ ...prev, [f.name]: "done" }));
+            setResults((prev) => [...prev, r]);
+            return r;
+          } catch {
+            setFileStatuses((prev) => ({ ...prev, [f.name]: "error" }));
+            return null;
+          }
+        })
+      );
+      const succeeded = settled.filter(Boolean) as typeof results;
+      if (succeeded.length === 0) throw new Error("All files failed to classify.");
+      setClassifyElapsed((Date.now() - t0) / 1000);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg.includes("fetch") || msg.includes("Failed")
@@ -72,6 +139,7 @@ export function Classify() {
         : msg);
     } finally {
       setLoading(false);
+      setClassifyStartTime(null);
     }
   }
 
@@ -112,10 +180,20 @@ export function Classify() {
         <div className={styles.fileList}>
           <span className={styles.fileCount}>{files.length} file{files.length !== 1 ? "s" : ""} selected</span>
           <div className={styles.filePills}>
-            {files.slice(0, 5).map((f) => <span key={f.name} className={styles.pill}>{f.name}</span>)}
-            {files.length > 5 && <span className={styles.pillMore}>+{files.length - 5} more</span>}
+            {files.map((f) => {
+              const status = fileStatuses[f.name];
+              return (
+                <span
+                  key={f.name}
+                  className={`${styles.pill} ${status === "done" ? styles.pillDone : status === "error" ? styles.pillError : status === "pending" ? styles.pillPending : ""}`}
+                >
+                  {status === "done" ? "✓ " : status === "error" ? "✗ " : status === "pending" ? "⋯ " : ""}
+                  {f.name}
+                </span>
+              );
+            })}
           </div>
-          <button onClick={() => { setFiles([]); setResults([]); }} className={styles.clearBtn}>clear</button>
+          {!loading && <button onClick={() => { setFiles([]); setResults([]); setFileStatuses({}); }} className={styles.clearBtn}>clear</button>}
         </div>
       )}
 
@@ -133,6 +211,18 @@ export function Classify() {
       </div>
 
       {error && <div className={styles.error}>{error}</div>}
+
+      {loading && classifyStartTime && (
+        <ElapsedTimer startTime={classifyStartTime} fileCount={files.length} />
+      )}
+
+      {results.length > 0 && classifyElapsed !== null && (
+        <TimeSavedBanner
+          fileCount={results.length}
+          elapsedSeconds={classifyElapsed}
+          manualMinutes={results.length * MANUAL_MINUTES_PER_DOC}
+        />
+      )}
 
       {results.length > 0 && (
         <div className={styles.results}>

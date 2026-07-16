@@ -15,6 +15,18 @@ export async function classifyBatch(
   return res.json();
 }
 
+export async function classifyOne(
+  file: File,
+  industry: string | null
+): Promise<ClassificationRecord> {
+  const form = new FormData();
+  form.append("file", file);
+  if (industry) form.append("industry", industry);
+  const res = await fetch(`${BASE}/classify`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function fetchResults(limit = 100, offset = 0): Promise<ClassificationRecord[]> {
   const res = await fetch(`${BASE}/results?limit=${limit}&offset=${offset}`);
   if (!res.ok) throw new Error(await res.text());

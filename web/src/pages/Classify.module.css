@@ -100,6 +100,10 @@
   white-space: nowrap;
 }
 
+.pillDone { border-color: var(--accent); color: var(--accent); }
+.pillError { border-color: var(--error); color: var(--error); }
+.pillPending { opacity: 0.6; }
+
 .pillMore {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -246,6 +250,58 @@
   flex-direction: column;
   gap: 1.25rem;
 }
+
+.elapsedBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+}
+.elapsedDot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.elapsedTime { margin-left: auto; color: var(--accent); font-weight: 600; }
+
+.timeSaved {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  flex-wrap: wrap;
+}
+.timeSavedMain { display: flex; align-items: baseline; gap: 0.4rem; }
+.timeSavedNum {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.03em;
+}
+.timeSavedLabel {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.timeSavedDetail {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.timeSavedDetail strong { color: var(--text-primary); }
 
 .detailFilename {
   font-family: var(--font-display);

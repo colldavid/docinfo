@@ -1,31 +1,35 @@
-FROM python:3.11-slim
+# ── Stage 1: build React frontend ─────────────────────────────────────────────
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/web
+COPY web/package*.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+# ── Stage 2: Python backend + embedded frontend ────────────────────────────────
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install system deps needed by pdfplumber and python-docx
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpoppler-cpp-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies — baked into the image at build time.
-# No installation step needed at runtime; every container from this image
-# already has all packages available.
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY app/ ./app/
-COPY cli.py train.py ./
+COPY train.py ./
 COPY data/sic_to_industry.json ./data/sic_to_industry.json
-COPY eval/ ./eval/
-
-# Pre-trained model files (committed to repo, baked into image)
-# If model/ does not exist at build time, the image won't have classifiers —
-# run train.py first, commit model/, then rebuild.
 COPY model/ ./model/
 
-# Secrets are never baked in — inject ANTHROPIC_API_KEY and DATABASE_URL
-# at runtime via environment variables or .env.local volume mount.
+# Embed the built React app — FastAPI serves it from web/dist
+COPY --from=frontend-builder /app/web/dist ./web/dist
+
+RUN mkdir -p /app/cache /app/logs
+
+# Mount a volume at /app/data for SQLite persistence across restarts
+VOLUME ["/app/data"]
 
 EXPOSE 8000
 

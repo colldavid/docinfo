@@ -60,13 +60,14 @@ def load_samples(data_file: Path) -> tuple[list[str], list[str], list[str]]:
     return texts, doc_types, industries
 
 
-def embed_texts(texts: list[str]) -> np.ndarray:
+def embed_texts(texts: list[str], model_override: str | None = None) -> np.ndarray:
     """Embed all texts. Logs progress — this is the slow part."""
     from sentence_transformers import SentenceTransformer
     from app.config import settings
 
-    logger.info(f"Loading embedding model: {settings.embedding_model}")
-    model = SentenceTransformer(settings.embedding_model)
+    model_name = model_override or settings.embedding_model
+    logger.info(f"Loading embedding model: {model_name}")
+    model = SentenceTransformer(model_name)
 
     logger.info(f"Embedding {len(texts)} texts (this may take a few minutes)...")
     start = time.time()
@@ -151,6 +152,11 @@ def main(
         "--min-samples",
         help="Minimum samples required to train (lower for smoke tests)",
     ),
+    embedding_model: str = typer.Option(
+        None,
+        "--embedding-model",
+        help="Override embedding model path (e.g. model/embedding/doc_type after fine-tuning)",
+    ),
 ):
     """Train classifiers on EDGAR data and save model files."""
     if not data_file.exists():
@@ -173,7 +179,7 @@ def main(
         )
         raise typer.Exit(1)
 
-    embeddings = embed_texts(texts)
+    embeddings = embed_texts(texts, model_override=embedding_model)
 
     # Train document type classifier
     doc_type_model, doc_type_encoder, doc_type_report = train_classifier(
