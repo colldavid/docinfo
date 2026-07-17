@@ -17,8 +17,11 @@ class IndustryResult(BaseModel):
 
 
 class PainPoint(BaseModel):
-    label: str
-    similarity_score: float
+    label: str                          # the specific pain point (concise phrase)
+    context: str = ""                   # 1 sentence grounding it in the document
+    question: str = ""                  # a brainstorming/diligence question to pursue
+    category: str = ""                  # broad theme, for portfolio-level aggregation
+    similarity_score: float = 1.0       # legacy field, kept for stored-record compat
 
 
 class ConfidentialityResult(BaseModel):

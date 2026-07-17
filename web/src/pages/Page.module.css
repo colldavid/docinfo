@@ -70,11 +70,13 @@
 .portfolioRow:last-child { border-bottom: 1px solid var(--border-subtle); }
 .portfolioRowActive { border-color: var(--accent); }
 
+.portfolioRowHead { display: flex; align-items: stretch; }
+
 .portfolioRowBtn {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  width: 100%;
+  flex: 1;
   padding: 0.9rem 1.25rem;
   background: none;
   border: none;
@@ -83,6 +85,20 @@
   gap: 1rem;
 }
 .portfolioRowBtn:hover { background: var(--bg-card); }
+
+.portfolioRowDelete {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border-subtle);
+  padding: 0 1rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.portfolioRowDelete:hover { color: var(--error); background: var(--error-bg); }
 
 .portfolioRowName {
   font-family: var(--font-display);

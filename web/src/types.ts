@@ -6,7 +6,10 @@ export interface DocTypeResult {
 
 export interface PainPoint {
   label: string;
-  similarity_score: number;
+  context?: string;
+  question?: string;
+  category?: string;
+  similarity_score?: number;
 }
 
 export interface ConfidentialityResult {

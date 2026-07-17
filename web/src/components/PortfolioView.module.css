@@ -63,6 +63,36 @@
 
 .themeText { font-size: 0.9rem; color: var(--text-primary); margin: 0; line-height: 1.6; }
 
+.themeList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.themeItem {
+  position: relative;
+  padding-left: 1.1rem;
+  line-height: 1.55;
+}
+.themeItem::before {
+  content: "▪";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+.themeHeadline {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.themeHeadline::after { content: " — "; color: var(--text-muted); font-weight: 400; }
+
+.themeDetail { font-size: 0.9rem; color: var(--text-secondary); }
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -90,6 +120,67 @@
 .statRow { display: flex; align-items: baseline; gap: 0.5rem; }
 .statCount { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; color: var(--text-primary); min-width: 1.5rem; }
 .statKey { font-size: 0.8rem; color: var(--text-secondary); }
+
+.painThemes {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  padding: 1.25rem 1.5rem;
+}
+
+.painThemesLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 1rem;
+}
+
+.painThemesTotal {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.painThemesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem 2rem;
+}
+
+.painThemeRow { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.painThemeTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.painThemeName { font-size: 0.85rem; color: var(--text-secondary); }
+.painThemePct {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.painThemeTrack {
+  height: 5px;
+  background: var(--border-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.painThemeFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
 
 .detailCard {
   background: var(--bg-card);

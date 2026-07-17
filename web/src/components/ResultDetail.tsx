@@ -1,6 +1,62 @@
-import type { ClassificationRecord } from "../types";
+import { useState } from "react";
+import type { ClassificationRecord, PainPoint } from "../types";
+import { fetchActionItems } from "../api";
 import { ConfidentialityBadge, ImportanceBadge } from "./Badge";
 import styles from "./ResultDetail.module.css";
+
+function PainPointCard({ point }: { point: PainPoint }) {
+  const [expanded, setExpanded] = useState(false);
+  const [items, setItems] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function toggle() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && items === null && !loading) {
+      setLoading(true);
+      try {
+        setItems(await fetchActionItems(point.label, point.context ?? ""));
+      } catch {
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  return (
+    <div className={styles.painCard}>
+      {point.category && <span className={styles.ppCategory}>{point.category}</span>}
+      <p className={styles.ppLabel}>{point.label}</p>
+      {point.context && <p className={styles.ppContext}>{point.context}</p>}
+      {point.question && (
+        <p className={styles.ppQuestion}>
+          <span className={styles.ppQuestionIcon}>→</span>
+          {point.question}
+        </p>
+      )}
+
+      <button className={styles.ppMoreBtn} onClick={toggle}>
+        {expanded ? "Hide action items" : "Suggested action items"}
+        <span className={`${styles.ppChevron} ${expanded ? styles.ppChevronOpen : ""}`}>▾</span>
+      </button>
+
+      {expanded && (
+        <div className={styles.ppActions}>
+          {loading && <p className={styles.ppActionsLoading}>Generating action items…</p>}
+          {!loading && items && items.length > 0 && (
+            <ul className={styles.ppActionsList}>
+              {items.map((it, i) => <li key={i} className={styles.ppActionItem}>{it}</li>)}
+            </ul>
+          )}
+          {!loading && items && items.length === 0 && (
+            <p className={styles.ppActionsLoading}>No suggestions available.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ResultDetail({ record }: { record: ClassificationRecord }) {
   const flaggedDimensions = [
@@ -69,19 +125,20 @@ export function ResultDetail({ record }: { record: ClassificationRecord }) {
       {/* Pain points */}
       {record.pain_points.length > 0 && (
         <div className={styles.section}>
-          <p className={styles.sectionLabel}>Detected Pain Points</p>
-          <div className={styles.painPoints}>
-            {record.pain_points.map((pp) => (
-              <div key={pp.label} className={styles.painPoint}>
-                <span className={styles.ppLabel}>{pp.label}</span>
-              </div>
+          <p className={styles.painHeader}>
+            Pain Points
+            <span className={styles.painCount}>{record.pain_points.length}</span>
+          </p>
+          <div className={styles.painList}>
+            {record.pain_points.map((pp, i) => (
+              <PainPointCard key={pp.label + i} point={pp} />
             ))}
           </div>
         </div>
       )}
 
       {record.pain_points.length === 0 && (
-        <p className={styles.noPainPoints}>No pain points detected above threshold.</p>
+        <p className={styles.noPainPoints}>No structural pain points identified in this document.</p>
       )}
 
       {/* Rationale */}

@@ -90,44 +90,138 @@
   color: var(--text-muted);
 }
 
-.painPoints { display: flex; flex-direction: column; gap: 0.6rem; }
-
-.painPoint {
+.painHeader {
   display: flex;
   align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.painCount {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  line-height: 1.4;
+}
+
+.painList {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
 
+.painCard {
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  background: var(--bg-card);
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .ppLabel {
-  font-size: 0.825rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.ppContext {
+  font-size: 0.85rem;
   color: var(--text-secondary);
-  width: 200px;
+  line-height: 1.55;
+}
+
+.ppQuestion {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--accent);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.ppQuestionIcon {
+  font-style: normal;
   flex-shrink: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 700;
 }
 
-.bar {
-  flex: 1;
-  height: 3px;
-  background: var(--border-subtle);
-  border-radius: 2px;
-}
-
-.barFill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.4s ease;
-}
-
-.ppScore {
+.ppCategory {
+  align-self: flex-start;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-muted);
-  width: 2.5rem;
-  text-align: right;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+}
+
+.ppMoreBtn {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.ppMoreBtn:hover { opacity: 0.75; }
+
+.ppChevron { font-size: 0.65rem; transition: transform 0.15s; }
+.ppChevronOpen { transform: rotate(180deg); }
+
+.ppActions {
+  border-top: 1px dashed var(--border-subtle);
+  padding-top: 0.7rem;
+  margin-top: 0.15rem;
+}
+
+.ppActionsLoading {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.ppActionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ppActionItem {
+  position: relative;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.ppActionItem::before {
+  content: "▪";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
 }
 
 .noPainPoints {

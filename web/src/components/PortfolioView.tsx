@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ClassificationRecord, Portfolio } from "../types";
 import { ResultsTable } from "./ResultsTable";
 import { ResultDetail } from "./ResultDetail";
@@ -8,15 +8,22 @@ import styles from "./PortfolioView.module.css";
 interface Props {
   portfolio: Portfolio;
   records: ClassificationRecord[];
-  onDelete?: () => void;
 }
 
-export function PortfolioView({ portfolio, records, onDelete }: Props) {
+export function PortfolioView({ portfolio, records }: Props) {
   const [selected, setSelected] = useState<ClassificationRecord | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+
+  function handleSelect(r: ClassificationRecord) {
+    setSelected((prev) => prev?.id === r.id ? null : r);
+    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   const confCounts = tally(records, (r) => r.confidentiality?.label);
   const impCounts = tally(records, (r) => r.importance_level?.label);
-  const topPain = topN(records.flatMap((r) => r.pain_points), (p) => p.label, 6);
+  const allPain = records.flatMap((r) => r.pain_points);
+  const painByCategory = topN(allPain, (p) => p.category || "Operations & Process", 7);
+  const totalPain = allPain.length;
   const needsReview = records.filter((r) =>
     r.confidentiality?.needs_review || r.importance_level?.needs_review ||
     r.document_type?.needs_review || r.industry?.needs_review
@@ -36,9 +43,6 @@ export function PortfolioView({ portfolio, records, onDelete }: Props) {
         </div>
         <div className={styles.actions}>
           <a href={exportCsvUrl(portfolio.id)} download className={styles.exportBtn}>Export CSV</a>
-          {onDelete && (
-            <button className={styles.deleteBtn} onClick={onDelete}>Delete</button>
-          )}
         </div>
       </div>
 
@@ -46,7 +50,7 @@ export function PortfolioView({ portfolio, records, onDelete }: Props) {
       {portfolio.theme && (
         <div className={styles.theme}>
           <p className={styles.themeLabel}>Key Themes</p>
-          <p className={styles.themeText}>{portfolio.theme}</p>
+          <ThemeContent theme={portfolio.theme} />
         </div>
       )}
 
@@ -54,17 +58,6 @@ export function PortfolioView({ portfolio, records, onDelete }: Props) {
       <div className={styles.statsGrid}>
         <StatGroup label="Confidentiality" items={confCounts} colorFn={confColor} />
         <StatGroup label="Importance" items={impCounts} colorFn={impColor} />
-        {topPain.length > 0 && (
-          <div className={styles.statGroup}>
-            <p className={styles.statGroupLabel}>Top Pain Points</p>
-            {topPain.map(([label, count]) => (
-              <div key={label} className={styles.statRow}>
-                <span className={styles.statCount}>{count}×</span>
-                <span className={styles.statKey}>{label}</span>
-              </div>
-            ))}
-          </div>
-        )}
         <div className={styles.statGroup}>
           <p className={styles.statGroupLabel}>Flags</p>
           <div className={styles.statRow}>
@@ -76,16 +69,70 @@ export function PortfolioView({ portfolio, records, onDelete }: Props) {
         </div>
       </div>
 
+      {/* Pain points by theme — full width bar chart */}
+      {painByCategory.length > 0 && (
+        <div className={styles.painThemes}>
+          <p className={styles.painThemesLabel}>
+            Pain Points by Theme
+            <span className={styles.painThemesTotal}>{totalPain} across {records.length} doc{records.length !== 1 ? "s" : ""}</span>
+          </p>
+          <div className={styles.painThemesGrid}>
+            {painByCategory.map(([category, count]) => {
+              const pct = Math.round((count / totalPain) * 100);
+              return (
+                <div key={category} className={styles.painThemeRow}>
+                  <div className={styles.painThemeTop}>
+                    <span className={styles.painThemeName}>{category}</span>
+                    <span className={styles.painThemePct}>{pct}%</span>
+                  </div>
+                  <div className={styles.painThemeTrack}>
+                    <div className={styles.painThemeFill} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
-      <ResultsTable records={records} onSelect={setSelected} selectedId={selected?.id} />
+      <ResultsTable records={records} onSelect={handleSelect} selectedId={selected?.id} />
 
       {selected && (
-        <div className={styles.detailCard}>
+        <div className={styles.detailCard} ref={detailRef}>
           <p className={styles.detailFilename}>{selected.filename}</p>
           <ResultDetail record={selected} />
         </div>
       )}
     </div>
+  );
+}
+
+function ThemeContent({ theme }: { theme: string }) {
+  // New format: JSON array of {headline, detail}. Old format: plain prose.
+  let themes: { headline: string; detail: string }[] | null = null;
+  try {
+    const parsed = JSON.parse(theme);
+    if (Array.isArray(parsed) && parsed.every((t) => t && typeof t.detail === "string")) {
+      themes = parsed;
+    }
+  } catch {
+    themes = null;
+  }
+
+  if (!themes) {
+    return <p className={styles.themeText}>{theme}</p>;
+  }
+
+  return (
+    <ul className={styles.themeList}>
+      {themes.map((t, i) => (
+        <li key={i} className={styles.themeItem}>
+          {t.headline && <span className={styles.themeHeadline}>{t.headline}</span>}
+          <span className={styles.themeDetail}>{t.detail}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

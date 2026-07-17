@@ -11,5 +11,6 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
+    // Note: /api/login and /api/logout are handled by the proxy above
   },
 });

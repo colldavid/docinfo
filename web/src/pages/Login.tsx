@@ -12,7 +12,8 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/login", {
+      const base = import.meta.env.DEV ? "/api" : "";
+      const res = await fetch(`${base}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),

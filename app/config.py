@@ -12,11 +12,6 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     database_url: str = "sqlite:///local.db"
 
-    # Single-user auth — set these in .env.local
-    auth_username: str = "docinfo"
-    auth_password: str = "docinfo"
-    session_secret: str = "change-me-in-production"
-
     # Embedding model — swap here if upgrading
     embedding_model: str = "all-MiniLM-L6-v2"
 
@@ -24,8 +19,8 @@ class Settings(BaseSettings):
     pain_point_threshold: float = 0.40
 
     # Consistency check: re-run count when importance confidence < threshold
-    consistency_check_confidence_threshold: float = 0.7
-    consistency_check_runs: int = 3
+    consistency_check_confidence_threshold: float = 0.4
+    consistency_check_runs: int = 2
     consistency_check_temperature: float = 0.4
 
     # Classifier needs_review thresholds — applied to rescaled confidence (0=random, 1=certain)

@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Classify } from "./pages/Classify";
 import { History } from "./pages/History";
 import { NeedsReview } from "./pages/NeedsReview";
 import { Portfolios } from "./pages/Portfolios";
 import { About } from "./pages/About";
-import { Login } from "./pages/Login";
 import styles from "./App.module.css";
 
 type Page = "classify" | "history" | "portfolios" | "review" | "about";
@@ -19,27 +18,11 @@ const NAV: { id: Page; label: string }[] = [
 
 function App() {
   const [page, setPage] = useState<Page>("classify");
-  const [authed, setAuthed] = useState<boolean | null>(null); // null = checking
-
-  // Check if already authenticated on mount
-  useEffect(() => {
-    fetch("/results?limit=1")
-      .then((r) => setAuthed(r.status !== 401))
-      .catch(() => setAuthed(false));
-  }, []);
-
-  async function handleLogout() {
-    await fetch("/logout", { method: "POST" });
-    setAuthed(false);
-  }
-
-  if (authed === null) return null; // brief check — no flash
-  if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
 
   return (
     <div className={styles.layout}>
       <nav className={styles.nav}>
-        <span className={styles.logo}>DOCINFO</span>
+        <button className={styles.logo} onClick={() => setPage("classify")}>DOCINFO</button>
         <div className={styles.links}>
           {NAV.map(({ id, label }) => (
             <button
@@ -51,7 +34,6 @@ function App() {
             </button>
           ))}
         </div>
-        <button className={styles.signOut} onClick={handleLogout}>Sign out</button>
       </nav>
 
       <main className={styles.main}>

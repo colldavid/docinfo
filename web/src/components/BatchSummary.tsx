@@ -8,8 +8,15 @@ export function BatchSummary({ records }: Props) {
   const errors = records.filter((r) => r.error).length;
   const confCounts = tally(records, (r) => r.confidentiality?.label);
   const impCounts = tally(records, (r) => r.importance_level?.label);
-  const topPainPoints = topN(records.flatMap((r) => r.pain_points), (pp) => pp.label, 5);
-  const highPriority = records.filter((r) => r.importance_level?.label === "high" || r.confidentiality?.label === "restricted");
+
+  const allPain = records.flatMap((r) => r.pain_points);
+  const painByCategory = topN(allPain, (pp) => pp.category || "Operations & Process", 7);
+  const totalPain = allPain.length;
+
+  const lowConfidence = records.filter((r) =>
+    r.document_type?.needs_review || r.industry?.needs_review ||
+    r.confidentiality?.needs_review || r.importance_level?.needs_review
+  );
 
   return (
     <div className={styles.card}>
@@ -24,30 +31,50 @@ export function BatchSummary({ records }: Props) {
       <div className={styles.grid}>
         <Group label="Confidentiality" items={confCounts} colorClass={(k) => styles[`conf_${k}`]} />
         <Group label="Importance" items={impCounts} colorClass={(k) => styles[`imp_${k}`]} />
-        {topPainPoints.length > 0 && (
-          <div className={styles.group}>
-            <p className={styles.groupLabel}>Top Pain Points</p>
-            {topPainPoints.map(([label, count]) => (
-              <p key={label} className={styles.groupRow}>
-                <span className={styles.groupCount}>{count}×</span>
-                <span className={styles.groupKey}>{label}</span>
-              </p>
-            ))}
-          </div>
-        )}
       </div>
 
-      {highPriority.length > 0 && (
+      {painByCategory.length > 0 && (
+        <div className={styles.painThemes}>
+          <p className={styles.painThemesLabel}>
+            Pain Points by Theme
+            <span className={styles.painThemesTotal}>{totalPain} identified across {total} doc{total !== 1 ? "s" : ""}</span>
+          </p>
+          <div className={styles.painThemesGrid}>
+            {painByCategory.map(([category, count]) => {
+              const pct = Math.round((count / totalPain) * 100);
+              return (
+                <div key={category} className={styles.painThemeRow}>
+                  <div className={styles.painThemeTop}>
+                    <span className={styles.painThemeName}>{category}</span>
+                    <span className={styles.painThemePct}>{pct}%</span>
+                  </div>
+                  <div className={styles.painThemeTrack}>
+                    <div className={styles.painThemeFill} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {lowConfidence.length > 0 && (
         <div className={styles.alert}>
-          <p className={styles.alertTitle}>Needs attention — {highPriority.length} doc{highPriority.length !== 1 ? "s" : ""}</p>
-          {highPriority.map((r) => (
-            <p key={r.id} className={styles.alertRow}>
-              <span className={styles.alertFile}>{r.filename}</span>
-              <span className={styles.alertReason}>
-                {[r.confidentiality?.label === "restricted" && "restricted", r.importance_level?.label === "high" && "high importance"].filter(Boolean).join(", ")}
-              </span>
-            </p>
-          ))}
+          <p className={styles.alertTitle}>Needs review — {lowConfidence.length} doc{lowConfidence.length !== 1 ? "s" : ""} with low confidence</p>
+          {lowConfidence.map((r) => {
+            const reasons = [
+              r.document_type?.needs_review && "doc type",
+              r.industry?.needs_review && "industry",
+              r.confidentiality?.needs_review && "confidentiality",
+              r.importance_level?.needs_review && "importance",
+            ].filter(Boolean);
+            return (
+              <p key={r.id} className={styles.alertRow}>
+                <span className={styles.alertFile}>{r.filename}</span>
+                <span className={styles.alertReason}>{reasons.join(", ")}</span>
+              </p>
+            );
+          })}
         </div>
       )}
     </div>

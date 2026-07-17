@@ -3,6 +3,17 @@ import type { ClassificationRecord, Portfolio } from "./types";
 // In dev, Vite proxies /api → localhost:8000. In prod (served by FastAPI), no prefix needed.
 const BASE = import.meta.env.DEV ? "/api" : "";
 
+export async function fetchActionItems(label: string, context: string): Promise<string[]> {
+  const res = await fetch(`${BASE}/pain-points/action-items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label, context }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.action_items ?? [];
+}
+
 export async function classifyBatch(
   files: File[],
   industry: string | null

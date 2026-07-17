@@ -17,45 +17,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from itsdangerous import BadSignature, URLSafeTimedSerializer
+from pydantic import BaseModel
 from sqlalchemy import or_
 
 from app.classify import classify_document
 from app.database import ClassificationRecord, Portfolio, get_session, init_db
 from app.ingestion import parse_document
+from app.pipelines.action_items import suggest_action_items
 from app.pipelines.theme import synthesize_theme
 
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _WEB_DIST = _PROJECT_ROOT / "web" / "dist"
-
-# ---------------------------------------------------------------------------
-# Auth helpers
-# ---------------------------------------------------------------------------
-
-_COOKIE = "docinfo_session"
-_UNPROTECTED = {"/health", "/login", "/logout"}
-
-
-def _signer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(settings.session_secret)
-
-
-def _is_authenticated(request: Request) -> bool:
-    token = request.cookies.get(_COOKIE)
-    if not token:
-        return False
-    try:
-        _signer().loads(token, max_age=86400 * 7)  # 7-day session
-        return True
-    except BadSignature:
-        return False
-
 
 app = FastAPI(
     title="DocInfo",
@@ -69,44 +47,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    path = request.url.path
-    # Allow unprotected paths and static assets through
-    if path in _UNPROTECTED or path.startswith("/assets"):
-        return await call_next(request)
-    # API routes return 401 when unauthenticated (frontend handles redirect)
-    if path.startswith("/") and not _is_authenticated(request):
-        if path.startswith("/classify") or path.startswith("/results") or \
-           path.startswith("/portfolios") or path.startswith("/search"):
-            return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
-    return await call_next(request)
-
-
-@app.post("/login")
-async def login(request: Request):
-    data = await request.json()
-    if (data.get("username") == settings.auth_username and
-            data.get("password") == settings.auth_password):
-        token = _signer().dumps("authenticated")
-        response = JSONResponse({"ok": True})
-        response.set_cookie(
-            _COOKIE, token,
-            httponly=True, samesite="lax",
-            max_age=86400 * 7,
-            secure=False,  # set True behind HTTPS in prod
-        )
-        return response
-    raise HTTPException(status_code=401, detail="Invalid credentials")
-
-
-@app.post("/logout")
-async def logout():
-    response = JSONResponse({"ok": True})
-    response.delete_cookie(_COOKIE)
-    return response
 
 
 @app.on_event("startup")
@@ -164,6 +104,18 @@ def health():
     return {"status": "ok"}
 
 
+class ActionItemsBody(BaseModel):
+    label: str
+    context: str = ""
+
+
+@app.post("/pain-points/action-items")
+def pain_point_action_items(body: ActionItemsBody):
+    """Generate concrete consulting action items for a single pain point, on demand."""
+    items = suggest_action_items(body.label, body.context)
+    return {"action_items": items}
+
+
 @app.post("/classify", status_code=201)
 async def classify(
     file: UploadFile = File(...),
@@ -212,7 +164,13 @@ def _persist_record(result, session) -> ClassificationRecord:
         industry_needs_review=result.industry.needs_review if result.industry else False,
         industry_user_provided=result.industry.user_provided if result.industry else False,
         pain_points=[
-            {"label": p.label, "similarity_score": p.similarity_score}
+            {
+                "label": p.label,
+                "context": p.context,
+                "question": p.question,
+                "category": p.category,
+                "similarity_score": p.similarity_score,
+            }
             for p in result.pain_points
         ],
         confidentiality_label=result.confidentiality.label if result.confidentiality else None,

@@ -90,7 +90,13 @@ def classify_document(path: Path, text: str, industry: str | None = None) -> Cla
         ),
         industry=industry_result,
         pain_points=[
-            PainPoint(label=p["label"], similarity_score=p["similarity_score"])
+            PainPoint(
+                label=p["label"],
+                context=p.get("context", ""),
+                question=p.get("question", ""),
+                category=p.get("category", ""),
+                similarity_score=p.get("similarity_score", 1.0),
+            )
             for p in pain_point_dicts
         ],
         confidentiality=ConfidentialityResult(

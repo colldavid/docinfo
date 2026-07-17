@@ -47,20 +47,28 @@ export function Portfolios() {
         <div className={styles.portfolioList}>
           {portfolios.map((p) => (
             <div key={p.id} className={`${styles.portfolioRow} ${selected?.id === p.id ? styles.portfolioRowActive : ""}`}>
-              <button className={styles.portfolioRowBtn} onClick={() => handleSelect(p)}>
-                <span className={styles.portfolioRowName}>{p.name}</span>
-                <span className={styles.portfolioRowMeta}>
-                  {p.record_count} doc{p.record_count !== 1 ? "s" : ""}
-                  {" · "}
-                  {new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </span>
-              </button>
+              <div className={styles.portfolioRowHead}>
+                <button className={styles.portfolioRowBtn} onClick={() => handleSelect(p)}>
+                  <span className={styles.portfolioRowName}>{p.name}</span>
+                  <span className={styles.portfolioRowMeta}>
+                    {p.record_count} doc{p.record_count !== 1 ? "s" : ""}
+                    {" · "}
+                    {new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                </button>
+                <button
+                  className={styles.portfolioRowDelete}
+                  onClick={() => handleDelete(p.id)}
+                  title="Delete portfolio"
+                >
+                  Delete
+                </button>
+              </div>
               {selected?.id === p.id && selected.records && (
                 <div className={styles.portfolioDetail}>
                   <PortfolioView
                     portfolio={selected}
                     records={selected.records}
-                    onDelete={() => handleDelete(p.id)}
                   />
                 </div>
               )}
