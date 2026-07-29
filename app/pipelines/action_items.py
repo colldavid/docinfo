@@ -9,9 +9,7 @@ could take — framed as engagement actions, not generic advice.
 import json
 import logging
 
-import anthropic
-
-from app.config import settings
+from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +29,10 @@ Return ONLY a JSON array of 3 short action-item strings (one sentence each). No 
 
 def suggest_action_items(label: str, context: str) -> list[str]:
     try:
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        raw = call_llm(
+            user_message=PROMPT.format(label=label, context=context or "(none provided)"),
             max_tokens=400,
-            messages=[{"role": "user", "content": PROMPT.format(label=label, context=context or "(none provided)")}],
         )
-        raw = msg.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1].lstrip("json").strip()
         parsed = json.loads(raw)

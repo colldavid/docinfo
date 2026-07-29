@@ -19,9 +19,7 @@ support percentage rollups across a batch, not describe an individual document.
 import json
 import logging
 
-import anthropic
-
-from app.config import settings
+from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +78,7 @@ def _cap_for_length(text: str) -> int:
     return min(cap, 8)
 
 
-def _extract_pain_points(client: anthropic.Anthropic, text: str) -> list[dict]:
+def _extract_pain_points(text: str) -> list[dict]:
     n = _cap_for_length(text)
     doc_snippet = text[:6000]
     prompt = EXTRACT_PROMPT.format(
@@ -89,12 +87,7 @@ def _extract_pain_points(client: anthropic.Anthropic, text: str) -> list[dict]:
         text=doc_snippet,
     )
 
-    msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1200,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    raw = msg.content[0].text.strip()
+    raw = call_llm(user_message=prompt, max_tokens=1200)
     if raw.startswith("```"):
         raw = raw.split("```")[1].lstrip("json").strip()
 
@@ -128,9 +121,8 @@ def detect_pain_points(
     industry: str = "",
     threshold: float | None = None,
 ) -> list[dict]:
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     try:
-        points = _extract_pain_points(client, text)
+        points = _extract_pain_points(text)
         logger.debug(f"Pain points ({len(points)}): {[p['label'] for p in points]}")
         return points
     except Exception as e:

@@ -1,0 +1,23 @@
+# Render Blueprint — deploys DocInfo as a single Docker web service.
+# One service builds the frontend + backend from the Dockerfile and serves both on $PORT.
+#
+# To deploy: push this repo to GitHub, then in Render click
+#   New → Blueprint → connect the repo. Render reads this file automatically.
+# You will be prompted to enter ANTHROPIC_API_KEY (it is NOT stored in the repo).
+
+services:
+  - type: web
+    name: docinfo
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter          # 512MB RAM is tight for the embedding model; bump to standard if it OOMs
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false        # prompts you to paste it in the Render dashboard; never committed
+      - key: DATABASE_URL
+        value: sqlite:////var/data/local.db
+    disk:
+      name: docinfo-data   # persists the SQLite history across restarts/redeploys
+      mountPath: /var/data
+      sizeGB: 1

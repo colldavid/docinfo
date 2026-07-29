@@ -12,6 +12,18 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     database_url: str = "sqlite:///local.db"
 
+    # ── LLM provider config ────────────────────────────────────────────────
+    # The project is provider-agnostic: point it at whatever the firm approves.
+    #   llm_provider: "anthropic" (default) or "openai" (covers Azure OpenAI / Copilot-tenant)
+    #   llm_model:    the model id for that provider
+    #   llm_base_url: optional override for the API endpoint (e.g. an Azure/enterprise gateway)
+    # Only the reasoning tasks (confidentiality-refine, importance, pain points,
+    # summary, theme, action items) use the LLM. Classification is fully local.
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-haiku-4-5-20251001"
+    llm_base_url: str | None = None
+    openai_api_key: str | None = None
+
     # Embedding model — swap here if upgrading
     embedding_model: str = "all-MiniLM-L6-v2"
 

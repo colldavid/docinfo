@@ -14,9 +14,8 @@ import json
 import logging
 from typing import Any
 
-import anthropic
-
 from app.config import settings
+from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -153,20 +152,17 @@ def _build_user_prompt(text: str, pain_points: list[dict], confidentiality_label
     )
 
 
-def _call_haiku(
-    client: anthropic.Anthropic,
+def _call_llm(
     user_message: str,
     temperature: float = 0,
 ) -> dict[str, Any]:
-    """Single Haiku call. Returns parsed JSON dict or raises on schema failure."""
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    """Single LLM call. Returns parsed JSON dict or raises on schema failure."""
+    raw = call_llm(
+        user_message=user_message,
+        system=SYSTEM_PROMPT,
         max_tokens=256,
         temperature=temperature,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
     )
-    raw = response.content[0].text.strip()
 
     # Strip markdown fences if present
     if raw.startswith("```"):
@@ -188,16 +184,15 @@ def _call_haiku(
 
 
 def _call_with_retry(
-    client: anthropic.Anthropic,
     user_message: str,
     temperature: float = 0,
     max_retries: int = 3,
 ) -> dict[str, Any]:
-    """Call Haiku with retry on schema validation failure."""
+    """Call the LLM with retry on schema validation failure."""
     last_error = None
     for attempt in range(1, max_retries + 1):
         try:
-            return _call_haiku(client, user_message, temperature=temperature)
+            return _call_llm(user_message, temperature=temperature)
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             last_error = e
             logger.warning(f"Importance LLM response failed schema validation (attempt {attempt}): {e}")
@@ -205,7 +200,6 @@ def _call_with_retry(
 
 
 def _consistency_check(
-    client: anthropic.Anthropic,
     user_message: str,
 ) -> tuple[str, bool]:
     """
@@ -219,7 +213,7 @@ def _consistency_check(
     labels = []
     for i in range(n):
         try:
-            result = _call_with_retry(client, user_message, temperature=temp)
+            result = _call_with_retry(user_message, temperature=temp)
             labels.append(result["label"])
         except Exception as e:
             logger.warning(f"Consistency check run {i+1} failed: {e}")
@@ -253,11 +247,10 @@ def classify_importance(
         "needs_review": bool,
     }
     """
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     user_message = _build_user_prompt(text, pain_points, confidentiality_label)
 
     # Primary classification at temp 0
-    result = _call_with_retry(client, user_message, temperature=0)
+    result = _call_with_retry(user_message, temperature=0)
     confidence = result["confidence"]
 
     needs_review = confidence < settings.consistency_check_confidence_threshold
@@ -266,7 +259,7 @@ def classify_importance(
             f"Confidence {confidence:.2f} below threshold "
             f"{settings.consistency_check_confidence_threshold} — running consistency check"
         )
-        majority_label, disagreed = _consistency_check(client, user_message)
+        majority_label, disagreed = _consistency_check(user_message)
         needs_review = needs_review or disagreed
         # If the consistency check produced a different majority, update the label
         # but keep the original rationale (it came from temp=0, most coherent)

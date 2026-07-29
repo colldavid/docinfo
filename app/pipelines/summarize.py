@@ -3,8 +3,7 @@ Document summarization pipeline.
 Generates a 2-3 sentence executive summary using Claude Haiku.
 """
 import logging
-import anthropic
-from app.config import settings
+from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +19,12 @@ Maximum 60 words.\
 def summarize_document(text: str) -> str:
     """Returns a 2-3 sentence plain-text summary, or empty string on failure."""
     try:
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        return call_llm(
+            user_message=f"Document text (truncated):\n{text[:3000]}",
+            system=SYSTEM_PROMPT,
             max_tokens=300,
             temperature=0,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": f"Document text (truncated):\n{text[:3000]}"}],
         )
-        return response.content[0].text.strip()
     except Exception as e:
         logger.warning(f"Summarization failed: {e}")
         return ""

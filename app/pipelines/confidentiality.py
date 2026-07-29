@@ -16,9 +16,8 @@ import json
 import logging
 from typing import Any
 
-import anthropic
-
 from app.config import settings
+from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -164,19 +163,16 @@ def _build_user_prompt(text: str) -> str:
     return USER_PROMPT_TEMPLATE.format(text=text[:3000])
 
 
-def _call_haiku(
-    client: anthropic.Anthropic,
+def _call_llm(
     user_message: str,
     temperature: float = 0,
 ) -> dict[str, Any]:
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    raw = call_llm(
+        user_message=user_message,
+        system=SYSTEM_PROMPT,
         max_tokens=256,
         temperature=temperature,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
     )
-    raw = response.content[0].text.strip()
 
     if raw.startswith("```"):
         raw = "\n".join(raw.split("\n")[1:])
@@ -196,7 +192,6 @@ def _call_haiku(
 
 
 def _call_with_retry(
-    client: anthropic.Anthropic,
     user_message: str,
     temperature: float = 0,
     max_retries: int = 3,
@@ -204,7 +199,7 @@ def _call_with_retry(
     last_error = None
     for attempt in range(1, max_retries + 1):
         try:
-            return _call_haiku(client, user_message, temperature=temperature)
+            return _call_llm(user_message, temperature=temperature)
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             last_error = e
             logger.warning(f"Confidentiality response failed schema validation (attempt {attempt}): {e}")
@@ -212,7 +207,6 @@ def _call_with_retry(
 
 
 def _consistency_check(
-    client: anthropic.Anthropic,
     user_message: str,
 ) -> tuple[str, bool]:
     n = settings.consistency_check_runs
@@ -221,7 +215,7 @@ def _consistency_check(
     labels = []
     for i in range(n):
         try:
-            result = _call_with_retry(client, user_message, temperature=temp)
+            result = _call_with_retry(user_message, temperature=temp)
             labels.append(result["label"])
         except Exception as e:
             logger.warning(f"Confidentiality consistency check run {i+1} failed: {e}")
@@ -250,10 +244,9 @@ def classify_confidentiality(text: str) -> dict[str, Any]:
         "needs_review": bool,
     }
     """
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     user_message = _build_user_prompt(text)
 
-    result = _call_with_retry(client, user_message, temperature=0)
+    result = _call_with_retry(user_message, temperature=0)
     confidence = result["confidence"]
 
     needs_review = confidence < settings.consistency_check_confidence_threshold
@@ -261,7 +254,7 @@ def classify_confidentiality(text: str) -> dict[str, Any]:
         logger.info(
             f"Confidentiality confidence {confidence:.2f} below threshold — running consistency check"
         )
-        majority_label, disagreed = _consistency_check(client, user_message)
+        majority_label, disagreed = _consistency_check(user_message)
         needs_review = needs_review or disagreed
         if majority_label != result["label"]:
             logger.info(f"Consistency check overriding confidentiality: {result['label']} → {majority_label}")

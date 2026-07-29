@@ -5,8 +5,7 @@ bullet points (stored as JSON) so the UI can render them cleanly.
 """
 import json
 import logging
-import anthropic
-from app.config import settings
+from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +27,13 @@ def synthesize_theme(summaries: list[str]) -> str:
     if not summaries:
         return ""
     try:
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         bullet_list = "\n".join(f"- {s}" for s in summaries if s)
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        raw = call_llm(
+            user_message=f"Document summaries:\n{bullet_list}",
+            system=SYSTEM_PROMPT,
             max_tokens=700,
             temperature=0,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": f"Document summaries:\n{bullet_list}"}],
         )
-        raw = response.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1].lstrip("json").strip()
 
