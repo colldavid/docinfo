@@ -66,6 +66,10 @@ export function exportCsvUrl(portfolioId?: number): string {
   return portfolioId ? `${base}/results/export?portfolio_id=${portfolioId}` : `${base}/results/export`;
 }
 
+export function deliverableUrl(portfolioId: number): string {
+  return `${BASE}/portfolios/${portfolioId}/deliverable`;
+}
+
 export async function createPortfolio(name: string, recordIds: number[]): Promise<Portfolio> {
   const res = await fetch(`${BASE}/portfolios`, {
     method: "POST",

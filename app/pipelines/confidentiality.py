@@ -17,6 +17,7 @@ import logging
 from typing import Any
 
 from app.config import settings
+from app.pipelines.llm_cache import cached_call
 from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
@@ -244,6 +245,14 @@ def classify_confidentiality(text: str) -> dict[str, Any]:
         "needs_review": bool,
     }
     """
+    # Same document → identical result, including any consistency-check outcome.
+    return cached_call(
+        ["confidentiality_v1", text[:3000]],
+        lambda: _classify_uncached(text),
+    )
+
+
+def _classify_uncached(text: str) -> dict[str, Any]:
     user_message = _build_user_prompt(text)
 
     result = _call_with_retry(user_message, temperature=0)

@@ -3,6 +3,7 @@ Document summarization pipeline.
 Generates a 2-3 sentence executive summary using Claude Haiku.
 """
 import logging
+from app.pipelines.llm_cache import cached_call
 from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
@@ -19,11 +20,15 @@ Maximum 60 words.\
 def summarize_document(text: str) -> str:
     """Returns a 2-3 sentence plain-text summary, or empty string on failure."""
     try:
-        return call_llm(
-            user_message=f"Document text (truncated):\n{text[:3000]}",
-            system=SYSTEM_PROMPT,
-            max_tokens=300,
-            temperature=0,
+        # Same document text → identical summary, replayed from cache.
+        return cached_call(
+            ["summarize_v1", text[:3000]],
+            lambda: call_llm(
+                user_message=f"Document text (truncated):\n{text[:3000]}",
+                system=SYSTEM_PROMPT,
+                max_tokens=300,
+                temperature=0,
+            ),
         )
     except Exception as e:
         logger.warning(f"Summarization failed: {e}")

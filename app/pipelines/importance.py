@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 from app.config import settings
+from app.pipelines.llm_cache import cached_call
 from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
@@ -247,6 +248,20 @@ def classify_importance(
         "needs_review": bool,
     }
     """
+    # Key includes everything that shapes the prompt — text, pain point labels,
+    # and confidentiality — so identical inputs replay the identical verdict.
+    pain_labels = sorted(str(p.get("label", "")) for p in pain_points)
+    return cached_call(
+        ["importance_v1", text[:3000], "|".join(pain_labels), confidentiality_label],
+        lambda: _classify_uncached(text, pain_points, confidentiality_label),
+    )
+
+
+def _classify_uncached(
+    text: str,
+    pain_points: list[dict],
+    confidentiality_label: str,
+) -> dict[str, Any]:
     user_message = _build_user_prompt(text, pain_points, confidentiality_label)
 
     # Primary classification at temp 0

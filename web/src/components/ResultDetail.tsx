@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ClassificationRecord, PainPoint } from "../types";
 import { fetchActionItems } from "../api";
 import { ConfidentialityBadge, ImportanceBadge } from "./Badge";
+import { CorrectLabels } from "./CorrectLabels";
 import styles from "./ResultDetail.module.css";
 
 function PainPointCard({ point }: { point: PainPoint }) {
@@ -121,6 +122,15 @@ export function ResultDetail({ record }: { record: ClassificationRecord }) {
           )}
         </StatCard>
       </div>
+
+      {/* Human label correction (feedback loop → retraining data) */}
+      <CorrectLabels
+        recordId={record.id}
+        docType={record.document_type?.label ?? null}
+        industry={record.industry?.label ?? null}
+        userDocType={record.user_doc_type}
+        userIndustry={record.user_industry}
+      />
 
       {/* Pain points */}
       {record.pain_points.length > 0 && (

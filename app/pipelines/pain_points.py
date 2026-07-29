@@ -9,30 +9,70 @@ Design (document level):
     so a dense 10-page report can surface more than a half-page memo.
   - Only STRUCTURAL problems (fixable process/capability/strategy gaps), never bare
     outcomes ("revenue down 18%") or external conditions ("port congestion").
-  - Each point is also tagged with a broad CATEGORY, used only for portfolio-level
-    aggregation — at the document level we show the specific point, not the category.
 
-The broad categories are intentionally coarse (7 buckets) because they only need to
-support percentage rollups across a batch, not describe an individual document.
+Category assignment (portfolio rollups) is CLASSICAL ML, not LLM: each extracted
+pain point is embedded locally and matched to the nearest category prototype by
+cosine similarity. Deterministic, instant, free — the LLM never chooses buckets,
+so portfolio percentages cannot drift between runs.
+
+Determinism: the whole extraction is cached content-addressed (see llm_cache) —
+re-classifying an unchanged document replays the identical result.
 """
 
 import json
 import logging
 
+import numpy as np
+
+from app.pipelines.embeddings import embed, embed_one
+from app.pipelines.llm_cache import cached_call
 from app.pipelines.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
 # Coarse buckets for portfolio-level rollup only. Kept small on purpose.
-BROAD_CATEGORIES = [
-    "People & Talent",
-    "Operations & Process",
-    "Financial & Cost",
-    "Growth & Commercial",
-    "Data & Technology",
-    "Risk & Compliance",
-    "Strategy & Governance",
-]
+# Each maps to a prototype description; extracted pain points are assigned to
+# the nearest prototype by local embedding similarity.
+CATEGORY_PROTOTYPES: dict[str, str] = {
+    "People & Talent": (
+        "employee retention and turnover, hiring and recruiting, compensation and "
+        "incentives, career development and promotion paths, partnership track and "
+        "career progression, staffing shortages, workforce skills and training, "
+        "morale and burnout"
+    ),
+    "Operations & Process": (
+        "operational inefficiency, manual or fragmented processes, capacity planning, "
+        "production and throughput, quality control, supply chain and procurement "
+        "execution, logistics and fulfillment, maintenance"
+    ),
+    "Financial & Cost": (
+        "cash flow and working capital, cost structure and margins, budgeting and "
+        "forecasting, debt and covenants, liquidity, pricing of inputs, financial "
+        "planning discipline"
+    ),
+    "Growth & Commercial": (
+        "sales pipeline discipline, customer churn and retention, pricing strategy, "
+        "go-to-market, market expansion, client concentration, distribution channels, "
+        "product-market fit"
+    ),
+    "Data & Technology": (
+        "legacy systems and technology debt, poor data visibility and reporting, "
+        "system integration and sprawl, cybersecurity and data governance, IT "
+        "infrastructure, platform migrations"
+    ),
+    "Risk & Compliance": (
+        "regulatory compliance and licensing, legal exposure, audit findings, risk "
+        "controls, vendor and supplier concentration, safety incidents, "
+        "contractual obligations"
+    ),
+    "Strategy & Governance": (
+        "strategic direction and priorities, governance and decision rights, unclear "
+        "ownership, organizational alignment, M&A integration, board oversight, "
+        "change management"
+    ),
+}
+
+BROAD_CATEGORIES = list(CATEGORY_PROTOTYPES)
 
 EXTRACT_PROMPT = """\
 You are a senior consultant reviewing a client document. Identify the STRUCTURAL pain \
@@ -54,21 +94,45 @@ For each pain point provide:
   - "label": the specific problem, 4-10 words, concrete to THIS document
   - "context": one sentence quoting or closely paraphrasing the supporting evidence
   - "question": one sharp diligence/brainstorming question a consultant would raise
-  - "category": exactly one of {categories}
 
 Document:
 {text}
 
-Return ONLY a JSON array of objects with those four keys. If nothing structural exists, return [].
+Return ONLY a JSON array of objects with those three keys. If nothing structural exists, return [].
 Example:
 [
   {{
     "label": "no defined partnership track for associates",
     "context": "Exit interviews cite limited clarity on partnership track; first promotions in 14 months.",
-    "question": "What would a transparent, milestone-based promotion framework look like here?",
-    "category": "People & Talent"
+    "question": "What would a transparent, milestone-based promotion framework look like here?"
   }}
 ]"""
+
+# Bump when the prompt or output shape changes, so stale cache entries don't replay.
+_CACHE_VERSION = "pain_points_v3"
+
+# Prototype embedding matrix — computed once per process, order matches BROAD_CATEGORIES.
+_prototype_matrix: np.ndarray | None = None
+
+
+def _prototypes() -> np.ndarray:
+    global _prototype_matrix
+    if _prototype_matrix is None:
+        _prototype_matrix = embed([CATEGORY_PROTOTYPES[c] for c in BROAD_CATEGORIES])
+    return _prototype_matrix
+
+
+def _assign_category(label: str, context: str) -> str:
+    """
+    Nearest-prototype classification of one pain point. Local embeddings only —
+    deterministic for identical text, no API involved.
+    """
+    vec = embed_one(f"{label}. {context}".strip())
+    protos = _prototypes()
+    protos_norm = protos / (np.linalg.norm(protos, axis=1, keepdims=True) + 1e-10)
+    vec_norm = vec / (np.linalg.norm(vec) + 1e-10)
+    scores = protos_norm @ vec_norm
+    return BROAD_CATEGORIES[int(np.argmax(scores))]
 
 
 def _cap_for_length(text: str) -> int:
@@ -81,11 +145,7 @@ def _cap_for_length(text: str) -> int:
 def _extract_pain_points(text: str) -> list[dict]:
     n = _cap_for_length(text)
     doc_snippet = text[:6000]
-    prompt = EXTRACT_PROMPT.format(
-        n=n,
-        categories=", ".join(f'"{c}"' for c in BROAD_CATEGORIES),
-        text=doc_snippet,
-    )
+    prompt = EXTRACT_PROMPT.format(n=n, text=doc_snippet)
 
     raw = call_llm(user_message=prompt, max_tokens=1200)
     if raw.startswith("```"):
@@ -95,7 +155,6 @@ def _extract_pain_points(text: str) -> list[dict]:
     if not isinstance(parsed, list):
         return []
 
-    valid_categories = set(BROAD_CATEGORIES)
     out = []
     for item in parsed[:n]:
         if not isinstance(item, dict):
@@ -103,14 +162,13 @@ def _extract_pain_points(text: str) -> list[dict]:
         label = str(item.get("label", "")).strip()
         if not label:
             continue
-        category = str(item.get("category", "")).strip()
-        if category not in valid_categories:
-            category = "Operations & Process"  # safe default rather than drop
+        context = str(item.get("context", "")).strip()
         out.append({
             "label": label,
-            "context": str(item.get("context", "")).strip(),
+            "context": context,
             "question": str(item.get("question", "")).strip(),
-            "category": category,
+            # Bucketing is local ML, not an LLM choice — see module docstring.
+            "category": _assign_category(label, context),
             "similarity_score": 1.0,
         })
     return out
@@ -122,7 +180,10 @@ def detect_pain_points(
     threshold: float | None = None,
 ) -> list[dict]:
     try:
-        points = _extract_pain_points(text)
+        points = cached_call(
+            [_CACHE_VERSION, text[:6000]],
+            lambda: _extract_pain_points(text),
+        )
         logger.debug(f"Pain points ({len(points)}): {[p['label'] for p in points]}")
         return points
     except Exception as e:

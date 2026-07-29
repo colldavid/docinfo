@@ -4,7 +4,7 @@ Uses SQLite by default (DATABASE_URL in .env.local to override).
 """
 import json
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, Column, String, Float, Boolean, DateTime, Text, Integer, ForeignKey
+from sqlalchemy import create_engine, Column, String, Float, Boolean, DateTime, Text, Integer, ForeignKey, LargeBinary
 from sqlalchemy.orm import DeclarativeBase, Session, relationship
 
 from app.config import settings
@@ -25,7 +25,9 @@ class Portfolio(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
-    theme = Column(Text)  # Haiku-synthesized cross-doc theme
+    theme = Column(Text)  # LLM-synthesized cross-doc theme
+    # Cached contradiction-analysis result — JSON array, computed on demand
+    contradictions_json = Column(Text)
     records = relationship("ClassificationRecord", back_populates="portfolio")
 
 
@@ -67,6 +69,14 @@ class ClassificationRecord(Base):
 
     error = Column(Text)
 
+    # Extracted document text — enables cross-doc features (Q&A, contradictions)
+    doc_text = Column(Text)
+
+    # Human corrections (feedback loop) — set when a consultant overrides a label.
+    # The original classifier prediction stays in doc_type_label / industry.
+    user_doc_type = Column(String)
+    user_industry = Column(String)
+
     # Portfolio association
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=True)
     portfolio = relationship("Portfolio", back_populates="records")
@@ -80,8 +90,56 @@ class ClassificationRecord(Base):
         self.pain_points_json = json.dumps(value)
 
 
+class LLMCache(Base):
+    """
+    Content-addressed cache of LLM pipeline results.
+
+    Key = sha256 of (pipeline name + prompt version + inputs). Guarantees that
+    an unchanged document re-classified later produces byte-identical analysis —
+    temp-0 sampling alone cannot promise that — and makes repeat runs free.
+    """
+    __tablename__ = "llm_cache"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, nullable=False)  # JSON-encoded pipeline result
+    created_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class DocumentChunk(Base):
+    """
+    Embedded text chunk of a classified document. Written at classify time;
+    read by retrieval features (portfolio Q&A). Embedding is a float32 vector
+    stored as raw bytes (see app/pipelines/chunks.py for encode/decode).
+    """
+    __tablename__ = "document_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    record_id = Column(Integer, ForeignKey("classifications.id"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    embedding = Column(LargeBinary, nullable=False)
+
+
+# Columns added after the initial schema — naive additive migration for SQLite.
+# (table_name, column_name, SQL type)
+_MIGRATIONS = [
+    ("classifications", "doc_text", "TEXT"),
+    ("classifications", "user_doc_type", "VARCHAR"),
+    ("classifications", "user_industry", "VARCHAR"),
+    ("portfolios", "contradictions_json", "TEXT"),
+]
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Add any missing columns to pre-existing tables (SQLite has no built-in
+    # migrations; ADD COLUMN is safe and idempotent here).
+    with engine.connect() as conn:
+        for table, column, sql_type in _MIGRATIONS:
+            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            if column not in existing:
+                conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
+        conn.commit()
 
 
 def get_session() -> Session:

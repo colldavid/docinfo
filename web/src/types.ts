@@ -45,6 +45,9 @@ export interface ClassificationRecord {
   summary: string | null;
   error: string | null;
   portfolio_id?: number | null;
+  // Human label corrections — set when a consultant overrides the model
+  user_doc_type?: string | null;
+  user_industry?: string | null;
 }
 
 export interface Portfolio {

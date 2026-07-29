@@ -2,7 +2,9 @@ import { useRef, useState } from "react";
 import type { ClassificationRecord, Portfolio } from "../types";
 import { ResultsTable } from "./ResultsTable";
 import { ResultDetail } from "./ResultDetail";
-import { exportCsvUrl } from "../api";
+import { Contradictions } from "./Contradictions";
+import { AskPortfolio } from "./AskPortfolio";
+import { deliverableUrl, exportCsvUrl } from "../api";
 import styles from "./PortfolioView.module.css";
 
 interface Props {
@@ -42,6 +44,7 @@ export function PortfolioView({ portfolio, records }: Props) {
           </p>
         </div>
         <div className={styles.actions}>
+          <a href={deliverableUrl(portfolio.id)} target="_blank" rel="noopener" className={styles.exportBtn}>Deliverable (PDF)</a>
           <a href={exportCsvUrl(portfolio.id)} download className={styles.exportBtn}>Export CSV</a>
         </div>
       </div>
@@ -94,6 +97,10 @@ export function PortfolioView({ portfolio, records }: Props) {
           </div>
         </div>
       )}
+
+      {/* Cross-document analysis */}
+      <Contradictions portfolioId={portfolio.id} />
+      <AskPortfolio portfolioId={portfolio.id} />
 
       {/* Table */}
       <ResultsTable records={records} onSelect={handleSelect} selectedId={selected?.id} />

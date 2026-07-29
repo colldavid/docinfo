@@ -28,7 +28,12 @@ from app.classify import classify_document
 from app.database import ClassificationRecord, Portfolio, get_session, init_db
 from app.ingestion import parse_document
 from app.pipelines.action_items import suggest_action_items
+from app.pipelines.chunks import store_chunks
 from app.pipelines.theme import synthesize_theme
+from app.routes.ask import router as ask_router
+from app.routes.contradictions import router as contradictions_router
+from app.routes.corrections import router as corrections_router
+from app.routes.deliverable import router as deliverable_router
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +52,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Feature routers (app/routes/) — must be registered before the SPA catch-all mount below.
+app.include_router(contradictions_router)
+app.include_router(ask_router)
+app.include_router(corrections_router)
+app.include_router(deliverable_router)
 
 
 @app.on_event("startup")
@@ -91,6 +102,8 @@ def _record_to_dict(r: ClassificationRecord) -> dict:
             "needs_review": r.importance_needs_review,
         } if r.importance_label else None,
         "summary": r.summary,
+        "user_doc_type": r.user_doc_type,
+        "user_industry": r.user_industry,
         "error": r.error,
     }
 
@@ -146,16 +159,17 @@ async def classify(
     result = classify_document(tmp_path.with_name(Path(file.filename).name), text, industry=industry)
 
     with get_session() as session:
-        record = _persist_record(result, session)
+        record = _persist_record(result, session, text=text)
         session.commit()
         session.refresh(record)
         return JSONResponse(status_code=201, content=_record_to_dict(record))
 
 
-def _persist_record(result, session) -> ClassificationRecord:
+def _persist_record(result, session, text: str | None = None) -> ClassificationRecord:
     record = ClassificationRecord(
         filename=result.filename,
         classified_at=result.classified_at,
+        doc_text=text,
         doc_type_label=result.document_type.label if result.document_type else None,
         doc_type_probability=result.document_type.probability if result.document_type else None,
         doc_type_needs_review=result.document_type.needs_review if result.document_type else False,
@@ -185,6 +199,9 @@ def _persist_record(result, session) -> ClassificationRecord:
         error=result.error,
     )
     session.add(record)
+    if text:
+        session.flush()  # assigns record.id, needed for chunk FK
+        store_chunks(session, record.id, text)
     return record
 
 
@@ -219,17 +236,18 @@ async def classify_batch(
             None,
             lambda: classify_document(tmp_path.with_name(bare_name), text, industry=industry),
         )
-        return result
+        return result, text
 
     results = await asyncio.gather(*[_classify_one(f) for f in files], return_exceptions=False)
 
     output = []
     with get_session() as session:
-        for result in results:
-            if isinstance(result, dict) and "error" in result:
-                output.append(result)
+        for item in results:
+            if isinstance(item, dict) and "error" in item:
+                output.append(item)
             else:
-                record = _persist_record(result, session)
+                result, text = item
+                record = _persist_record(result, session, text=text)
                 session.flush()
                 session.refresh(record)
                 output.append(_record_to_dict(record))
