@@ -40,7 +40,11 @@ def _key(parts: list) -> str:
 
 
 def cached_call(key_parts: list, compute: Callable[[], Any]) -> Any:
-    key = _key(key_parts)
+    # The effective provider/model is part of every key: switching models in
+    # Settings must never replay another model's cached answers.
+    from app.pipelines.llm_client import _resolve
+    provider, model, _ = _resolve()
+    key = _key([provider, model, *key_parts])
 
     try:
         with get_session() as session:

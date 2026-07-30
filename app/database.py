@@ -26,8 +26,9 @@ class Portfolio(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
     theme = Column(Text)  # LLM-synthesized cross-doc theme
-    # Cached contradiction-analysis result — JSON array, computed on demand
+    # Cached cross-doc analyses — JSON, precomputed at creation / refreshed on demand
     contradictions_json = Column(Text)
+    entities_json = Column(Text)
     records = relationship("ClassificationRecord", back_populates="portfolio")
 
 
@@ -90,6 +91,19 @@ class ClassificationRecord(Base):
         self.pain_points_json = json.dumps(value)
 
 
+class AppSetting(Base):
+    """
+    Runtime-mutable settings (key/value), overriding .env defaults.
+
+    Lets the Settings UI change llm_model, thresholds, watch_dir, etc. without
+    a restart. Read through app.runtime_settings — never query directly.
+    """
+    __tablename__ = "app_settings"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, nullable=False)
+
+
 class LLMCache(Base):
     """
     Content-addressed cache of LLM pipeline results.
@@ -127,6 +141,7 @@ _MIGRATIONS = [
     ("classifications", "user_doc_type", "VARCHAR"),
     ("classifications", "user_industry", "VARCHAR"),
     ("portfolios", "contradictions_json", "TEXT"),
+    ("portfolios", "entities_json", "TEXT"),
 ]
 
 

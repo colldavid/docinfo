@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.config import settings
+from app import runtime_settings
 from app.models import (
     ClassificationResult,
     ConfidentialityResult,
@@ -56,7 +56,7 @@ def classify_document(path: Path, text: str, industry: str | None = None) -> Cla
             industry_result = IndustryResult(
                 label=industry_labels[0],
                 probability=round(industry_probs[0], 4),
-                needs_review=industry_probs[0] < settings.industry_review_threshold,
+                needs_review=industry_probs[0] < runtime_settings.get_float("industry_review_threshold"),
                 user_provided=False,
             )
         else:
@@ -67,7 +67,7 @@ def classify_document(path: Path, text: str, industry: str | None = None) -> Cla
                 user_provided=True,
             )
 
-    doc_type_needs_review = doc_type_prob < settings.doc_type_review_threshold
+    doc_type_needs_review = doc_type_prob < runtime_settings.get_float("doc_type_review_threshold")
 
     logger.debug(f"{filename}: doc_type={doc_type_label} ({doc_type_prob:.2f})")
     logger.debug(f"{filename}: pain_points={[p['label'] for p in pain_point_dicts]}")

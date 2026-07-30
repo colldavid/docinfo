@@ -19,32 +19,46 @@ that so callers use one signature regardless of provider.
 import logging
 
 from app.config import settings
+from app import runtime_settings
 
 logger = logging.getLogger(__name__)
 
-_client = None  # cached provider client (created once per process)
+# Cached client, keyed by the (provider, base_url) it was built for so a
+# runtime settings change transparently rebuilds it on the next call.
+_client = None
+_client_key: tuple | None = None
 
 
-def _get_client():
-    global _client
-    if _client is not None:
+def _resolve() -> tuple[str, str, str | None]:
+    """(provider, model, base_url) — runtime overrides layered over .env."""
+    provider = runtime_settings.get_setting("llm_provider").strip() or "anthropic"
+    model = runtime_settings.get_setting("llm_model").strip() or settings.llm_model
+    base_url = runtime_settings.get_setting("llm_base_url").strip() or None
+    return provider, model, base_url
+
+
+def _get_client(provider: str, base_url: str | None):
+    global _client, _client_key
+    key = (provider, base_url)
+    if _client is not None and _client_key == key:
         return _client
 
-    if settings.llm_provider == "anthropic":
+    if provider == "anthropic":
         import anthropic
         _client = anthropic.Anthropic(
             api_key=settings.anthropic_api_key,
-            base_url=settings.llm_base_url,  # None → default endpoint
+            base_url=base_url,  # None → default endpoint
         )
-    elif settings.llm_provider == "openai":
+    elif provider == "openai":
         from openai import OpenAI
         _client = OpenAI(
             api_key=settings.openai_api_key or settings.anthropic_api_key,
-            base_url=settings.llm_base_url,  # None → default; set for Azure/gateway
+            base_url=base_url,  # None → default; set for Azure/gateway
         )
     else:
-        raise ValueError(f"Unknown llm_provider: {settings.llm_provider!r}")
+        raise ValueError(f"Unknown llm_provider: {provider!r}")
 
+    _client_key = key
     return _client
 
 
@@ -60,10 +74,10 @@ def call_llm(
     Normalizes across providers: the same call works whether the backend is
     Anthropic or an OpenAI-compatible endpoint.
     """
-    client = _get_client()
-    model = settings.llm_model
+    provider, model, base_url = _resolve()
+    client = _get_client(provider, base_url)
 
-    if settings.llm_provider == "anthropic":
+    if provider == "anthropic":
         kwargs = {
             "model": model,
             "max_tokens": max_tokens,

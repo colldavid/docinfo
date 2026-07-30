@@ -244,6 +244,52 @@ def _validate(parsed: list, claims_by_doc: dict[str, list[str]]) -> list[dict]:
     return out
 
 
+def compute_and_store(portfolio, session) -> dict:
+    """
+    Run the two-stage analysis for a portfolio and persist the result on
+    portfolio.contradictions_json. Raises on stage-2 failure (caller decides
+    whether that is fatal). Called from the endpoint below AND from portfolio
+    creation, so the first view of a new portfolio is instant.
+    """
+    records = list(portfolio.records)
+    # Documents classified before doc_text was stored have no text to compare.
+    usable = [r for r in records if (r.doc_text or "").strip()]
+    considered = usable[:MAX_DOCS]
+    skipped = len(records) - len(considered)
+
+    # Stage 1 fans out one claim-extraction call per document; running them
+    # sequentially made large portfolios take ~N×(call latency). Parallel
+    # threads bring stage 1 down to roughly the latency of one call.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        extracted = list(pool.map(
+            lambda r: (r.filename, _extract_claims(r.filename, r.doc_text)),
+            considered,
+        ))
+
+    claims_by_doc: dict[str, list[str]] = {}
+    for filename, claims in extracted:
+        if claims:
+            # Duplicate filenames within a portfolio would collide in the
+            # by-filename map and make citations ambiguous; keep the first.
+            claims_by_doc.setdefault(filename, claims)
+
+    # One document with claims cannot contradict anything else.
+    if len(claims_by_doc) < 2:
+        contradictions: list[dict] = []
+    else:
+        contradictions = _find_contradictions(claims_by_doc)
+
+    portfolio.contradictions_json = json.dumps(contradictions)
+    session.commit()
+
+    return {
+        "contradictions": contradictions,
+        "checked_docs": len(considered),
+        "skipped_docs": skipped,
+        "cached": False,
+    }
+
+
 @router.post("/portfolios/{portfolio_id}/contradictions")
 def analyze_contradictions(portfolio_id: int, refresh: bool = False):
     """
@@ -274,43 +320,8 @@ def analyze_contradictions(portfolio_id: int, refresh: bool = False):
                     "cached": True,
                 }
 
-        # Documents classified before doc_text was stored have no text to compare.
-        usable = [r for r in records if (r.doc_text or "").strip()]
-        considered = usable[:MAX_DOCS]
-        skipped = len(records) - len(considered)
-
         try:
-            # Stage 1 fans out one claim-extraction call per document; running them
-            # sequentially made large portfolios take ~N×(call latency). Parallel
-            # threads bring stage 1 down to roughly the latency of one call.
-            with ThreadPoolExecutor(max_workers=8) as pool:
-                extracted = list(pool.map(
-                    lambda r: (r.filename, _extract_claims(r.filename, r.doc_text)),
-                    considered,
-                ))
-
-            claims_by_doc: dict[str, list[str]] = {}
-            for filename, claims in extracted:
-                if claims:
-                    # Duplicate filenames within a portfolio would collide in the
-                    # by-filename map and make citations ambiguous; keep the first.
-                    claims_by_doc.setdefault(filename, claims)
-
-            # One document with claims cannot contradict anything else.
-            if len(claims_by_doc) < 2:
-                contradictions: list[dict] = []
-            else:
-                contradictions = _find_contradictions(claims_by_doc)
+            return compute_and_store(portfolio, session)
         except Exception as e:
             logger.error(f"Contradiction analysis failed for portfolio {portfolio_id}: {e}")
             raise HTTPException(status_code=502, detail="Contradiction analysis failed")
-
-        portfolio.contradictions_json = json.dumps(contradictions)
-        session.commit()
-
-        return {
-            "contradictions": contradictions,
-            "checked_docs": len(considered),
-            "skipped_docs": skipped,
-            "cached": False,
-        }
