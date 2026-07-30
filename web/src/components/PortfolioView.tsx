@@ -3,6 +3,7 @@ import type { ClassificationRecord, Portfolio } from "../types";
 import { ResultsTable } from "./ResultsTable";
 import { ResultDetail } from "./ResultDetail";
 import { Contradictions } from "./Contradictions";
+import { EntitiesTimeline } from "./EntitiesTimeline";
 import { AskPortfolio } from "./AskPortfolio";
 import { deliverableUrl, exportCsvUrl } from "../api";
 import styles from "./PortfolioView.module.css";
@@ -100,6 +101,7 @@ export function PortfolioView({ portfolio, records }: Props) {
 
       {/* Cross-document analysis */}
       <Contradictions portfolioId={portfolio.id} />
+      <EntitiesTimeline portfolioId={portfolio.id} />
       <AskPortfolio portfolioId={portfolio.id} />
 
       {/* Table */}
