@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     database_url: str = "sqlite:///local.db"
 
+    # ── Auth (single-user) ─────────────────────────────────────────────────
+    # Auth is ON only when AUTH_PASSWORD is set in .env.local; empty = open app
+    # (local dev). Session cookies are signed with stdlib HMAC via session_secret.
+    auth_password: str = ""
+    session_secret: str = "docinfo-dev-secret-change-in-prod"
+
     # ── LLM provider config ────────────────────────────────────────────────
     # The project is provider-agnostic: point it at whatever the firm approves.
     #   llm_provider: "anthropic" (default) or "openai" (covers Azure OpenAI / Copilot-tenant)
