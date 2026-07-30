@@ -9,6 +9,7 @@ Endpoints:
 """
 import asyncio
 import csv
+from concurrent.futures import ThreadPoolExecutor
 import io
 import json
 import logging
@@ -17,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,13 +28,17 @@ from sqlalchemy import or_
 from app.classify import classify_document
 from app.database import ClassificationRecord, Portfolio, get_session, init_db
 from app.ingestion import parse_document
+from app.persistence import persist_record as _persist_record, record_to_dict as _record_to_dict
 from app.pipelines.action_items import suggest_action_items
-from app.pipelines.chunks import store_chunks
 from app.pipelines.theme import synthesize_theme
+from app.routes.app_settings import router as app_settings_router
 from app.routes.ask import router as ask_router
+from app.routes.auth import router as auth_router, is_authenticated
 from app.routes.contradictions import router as contradictions_router
 from app.routes.corrections import router as corrections_router
 from app.routes.deliverable import router as deliverable_router
+from app.routes.entities import router as entities_router
+from app.routes.watch import router as watch_router
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +59,28 @@ app.add_middleware(
 )
 
 # Feature routers (app/routes/) — must be registered before the SPA catch-all mount below.
+app.include_router(auth_router)
 app.include_router(contradictions_router)
 app.include_router(ask_router)
 app.include_router(corrections_router)
 app.include_router(deliverable_router)
+app.include_router(entities_router)
+app.include_router(app_settings_router)
+app.include_router(watch_router)
+
+# API prefixes that require a valid session when auth is enabled. The SPA shell,
+# assets, /health, and /auth/login/logout stay open (the login page needs them).
+_PROTECTED_PREFIXES = (
+    "/classify", "/results", "/portfolios", "/search",
+    "/labels", "/pain-points", "/settings", "/watch",
+)
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if request.url.path.startswith(_PROTECTED_PREFIXES) and not is_authenticated(request):
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    return await call_next(request)
 
 
 @app.on_event("startup")
@@ -66,50 +89,13 @@ def startup():
     # Pre-load the embedding model so concurrent requests don't race to initialize it
     from app.pipelines.embeddings import get_embedding_model
     get_embedding_model()
+    # Watched-folder auto-classify (no-op until a folder is configured in Settings)
+    from app.watcher import start_watcher
+    start_watcher()
 
 
 # ---------------------------------------------------------------------------
-# Serialization helpers
-# ---------------------------------------------------------------------------
-
-def _record_to_dict(r: ClassificationRecord) -> dict:
-    return {
-        "id": r.id,
-        "filename": r.filename,
-        "classified_at": r.classified_at.isoformat(),
-        "document_type": {
-            "label": r.doc_type_label,
-            "probability": r.doc_type_probability,
-            "needs_review": r.doc_type_needs_review,
-        } if r.doc_type_label else None,
-        "industry": {
-            "label": r.industry,
-            "probability": r.industry_probability,
-            "needs_review": r.industry_needs_review,
-            "user_provided": r.industry_user_provided,
-        } if r.industry else None,
-        "pain_points": r.pain_points,
-        "confidentiality": {
-            "label": r.confidentiality_label,
-            "rationale": r.confidentiality_rationale,
-            "confidence": r.confidentiality_confidence,
-            "needs_review": r.confidentiality_needs_review,
-        } if r.confidentiality_label else None,
-        "importance_level": {
-            "label": r.importance_label,
-            "rationale": r.importance_rationale,
-            "confidence": r.importance_confidence,
-            "needs_review": r.importance_needs_review,
-        } if r.importance_label else None,
-        "summary": r.summary,
-        "user_doc_type": r.user_doc_type,
-        "user_industry": r.user_industry,
-        "error": r.error,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Routes
+# Routes  (serialization helpers live in app/persistence.py)
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
@@ -163,46 +149,6 @@ async def classify(
         session.commit()
         session.refresh(record)
         return JSONResponse(status_code=201, content=_record_to_dict(record))
-
-
-def _persist_record(result, session, text: str | None = None) -> ClassificationRecord:
-    record = ClassificationRecord(
-        filename=result.filename,
-        classified_at=result.classified_at,
-        doc_text=text,
-        doc_type_label=result.document_type.label if result.document_type else None,
-        doc_type_probability=result.document_type.probability if result.document_type else None,
-        doc_type_needs_review=result.document_type.needs_review if result.document_type else False,
-        industry=result.industry.label if result.industry else None,
-        industry_probability=result.industry.probability if result.industry else None,
-        industry_needs_review=result.industry.needs_review if result.industry else False,
-        industry_user_provided=result.industry.user_provided if result.industry else False,
-        pain_points=[
-            {
-                "label": p.label,
-                "context": p.context,
-                "question": p.question,
-                "category": p.category,
-                "similarity_score": p.similarity_score,
-            }
-            for p in result.pain_points
-        ],
-        confidentiality_label=result.confidentiality.label if result.confidentiality else None,
-        confidentiality_rationale=result.confidentiality.rationale if result.confidentiality else None,
-        confidentiality_confidence=result.confidentiality.confidence if result.confidentiality else None,
-        confidentiality_needs_review=result.confidentiality.needs_review if result.confidentiality else None,
-        importance_label=result.importance_level.label if result.importance_level else None,
-        importance_rationale=result.importance_level.rationale if result.importance_level else None,
-        importance_confidence=result.importance_level.confidence if result.importance_level else None,
-        importance_needs_review=result.importance_level.needs_review if result.importance_level else None,
-        summary=result.summary,
-        error=result.error,
-    )
-    session.add(record)
-    if text:
-        session.flush()  # assigns record.id, needed for chunk FK
-        store_chunks(session, record.id, text)
-    return record
 
 
 @app.post("/classify/batch", status_code=201)
@@ -426,6 +372,30 @@ def create_portfolio(body: dict):
 
         session.commit()
         session.refresh(portfolio)
+        portfolio_id = portfolio.id
+
+    # Precompute contradictions + entities so the first portfolio view is instant.
+    # Concurrent (each analysis fans out its own LLM calls), each in its OWN
+    # session — SQLAlchemy sessions are not thread-safe. Non-fatal: the endpoints
+    # can always compute on demand.
+    from app.routes.contradictions import compute_and_store as _compute_contradictions
+    from app.routes.entities import compute_and_store as _compute_entities
+
+    def _precompute(compute, name: str):
+        try:
+            with get_session() as s:
+                p = s.get(Portfolio, portfolio_id)
+                if p:
+                    compute(p, s)
+        except Exception as e:
+            logger.warning(f"{name} precompute failed for portfolio {portfolio_id}: {e}")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        pool.submit(_precompute, _compute_contradictions, "Contradiction")
+        pool.submit(_precompute, _compute_entities, "Entity")
+
+    with get_session() as session:
+        portfolio = session.get(Portfolio, portfolio_id)
         return JSONResponse(status_code=201, content=_portfolio_to_dict(portfolio, include_records=True))
 
 
