@@ -166,9 +166,46 @@
 }
 .techNote { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
 
+/* Feature catalog */
+.featureGroups { display: flex; flex-direction: column; gap: 1.75rem; }
+
+.featureGroupTitle {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+
+.featureList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+
+.featureItem {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.featureName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.featureDesc { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+
 @media (max-width: 640px) {
   .statsBar { grid-template-columns: repeat(2, 1fr); }
   .techGrid { grid-template-columns: 1fr; }
+  .featureList { grid-template-columns: 1fr; }
   .tableHeader, .tableRow { grid-template-columns: 1fr; }
   .tableHeader span:first-child, .tableRow span.colDimension { display: none; }
 }

@@ -15,6 +15,10 @@ services:
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false        # prompts you to paste it in the Render dashboard; never committed
+      - key: AUTH_PASSWORD
+        sync: false        # REQUIRED for a public URL — without it the app runs with no login
+      - key: SESSION_SECRET
+        generateValue: true  # Render generates a random signing secret
       - key: DATABASE_URL
         value: sqlite:////var/data/local.db
     disk:

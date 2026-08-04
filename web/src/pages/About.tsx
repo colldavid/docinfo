@@ -14,7 +14,7 @@ const PIPELINE_STEPS = [
   {
     num: "03",
     label: "Extract",
-    desc: "Claude Haiku reads each document and surfaces operational pain points — explicit and implicit — using the detected industry as context.",
+    desc: "The LLM surfaces structural pain points — each grounded in document evidence, paired with a diligence question, and bucketed by local embeddings for portfolio rollups.",
   },
   {
     num: "04",
@@ -24,7 +24,54 @@ const PIPELINE_STEPS = [
   {
     num: "05",
     label: "Synthesize",
-    desc: "Across a portfolio, cross-document themes are synthesized into a 2-3 sentence brief — the equivalent of a pre-read summary for the engagement team.",
+    desc: "Across a portfolio: headlined cross-document themes, contradiction detection, entity & timeline mapping, and cited Q&A over the full document set.",
+  },
+];
+
+const FEATURE_GROUPS: { group: string; items: { name: string; desc: string }[] }[] = [
+  {
+    group: "Classify & Triage",
+    items: [
+      { name: "Batch classification", desc: "Upload files or drag a whole folder; every document processes in parallel with per-file progress." },
+      { name: "Doc type & industry", desc: "Local ML classifiers (97.1% / 94.5%) — instant, free, no data leaves the machine." },
+      { name: "Confidentiality & importance", desc: "LLM-scored with written rationale, confidence, and automatic consistency re-checks." },
+      { name: "Needs Review queue", desc: "Low-confidence classifications flagged with the exact dimension named — humans review only what needs it." },
+      { name: "Search & history", desc: "Every result stored, searchable by filename or summary content." },
+    ],
+  },
+  {
+    group: "Cross-Document Analysis",
+    items: [
+      { name: "Consistency Check", desc: "Finds where documents contradict each other — conflicting dates, numbers, and statuses, cited by file." },
+      { name: "Entities & timeline", desc: "Recurring companies, people, and vendors across the batch, plus a dated event chronology." },
+      { name: "Ask the Portfolio", desc: "Natural-language Q&A over the document set with per-document citations; retrieval is fully local." },
+      { name: "Key themes", desc: "Headlined cross-document patterns synthesized at portfolio creation." },
+    ],
+  },
+  {
+    group: "Consulting Outputs",
+    items: [
+      { name: "Deliverable export", desc: "One-click Current State Assessment — print-ready, branded, ~3 pages, save as PDF." },
+      { name: "Pain points + action items", desc: "Evidence-grounded problems with diligence questions and on-demand suggested next steps." },
+      { name: "CSV export", desc: "Any result set or portfolio, ready for downstream analysis." },
+    ],
+  },
+  {
+    group: "Learning & Trust",
+    items: [
+      { name: "Correction loop", desc: "Override any label; corrections become retraining data so the classifiers learn your document universe." },
+      { name: "Offline evaluation", desc: "Measure real accuracy on your own client documents, entirely on your machine." },
+      { name: "Deterministic results", desc: "Identical document in, identical analysis out — content-addressed caching, zero repeat cost." },
+    ],
+  },
+  {
+    group: "Operations & Governance",
+    items: [
+      { name: "Provider-agnostic LLM", desc: "Point at any firm-approved endpoint — Anthropic, Azure OpenAI, or an enterprise gateway — switchable at runtime." },
+      { name: "Access control", desc: "Password-protected sessions the moment a password is configured." },
+      { name: "Watched folder", desc: "Drop files into a directory; they classify automatically within seconds." },
+      { name: "Runtime settings", desc: "Model, thresholds, and cache management from the UI — no restarts, no config files." },
+    ],
   },
 ];
 
@@ -145,6 +192,26 @@ export function About() {
         </div>
       </section>
 
+      {/* Features catalog */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Feature catalog</h2>
+        <div className={styles.featureGroups}>
+          {FEATURE_GROUPS.map((g) => (
+            <div key={g.group} className={styles.featureGroup}>
+              <p className={styles.featureGroupTitle}>{g.group}</p>
+              <div className={styles.featureList}>
+                {g.items.map((f) => (
+                  <div key={f.name} className={styles.featureItem}>
+                    <p className={styles.featureName}>{f.name}</p>
+                    <p className={styles.featureDesc}>{f.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Tech note */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Under the hood</h2>
@@ -160,9 +227,9 @@ export function About() {
             note="Trained on 3,700+ labeled consulting documents across 24 industries"
           />
           <TechCard
-            label="LLM (extraction)"
-            value="Claude Haiku"
-            note="Pain points, confidentiality, importance, summaries, portfolio themes"
+            label="LLM (reasoning)"
+            value="Provider-agnostic"
+            note="Claude by default; switchable to any firm-approved endpoint (Azure OpenAI / gateway) at runtime"
           />
           <TechCard
             label="Backend"
