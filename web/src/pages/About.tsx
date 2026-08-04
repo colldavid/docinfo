@@ -61,7 +61,7 @@ const FEATURE_GROUPS: { group: string; items: { name: string; desc: string }[] }
     items: [
       { name: "Correction loop", desc: "Override any label; corrections become retraining data so the classifiers learn your document universe." },
       { name: "Offline evaluation", desc: "Measure real accuracy on your own client documents, entirely on your machine." },
-      { name: "Deterministic results", desc: "Identical document in, identical analysis out — content-addressed caching, zero repeat cost." },
+      { name: "Repeatable results", desc: "Classification is fully deterministic (local ML); LLM analysis is cached content-addressed, so unchanged documents replay identical results at zero repeat cost." },
     ],
   },
   {

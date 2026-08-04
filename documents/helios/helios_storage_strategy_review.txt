@@ -1,0 +1,28 @@
+Helios Renewables — Battery Storage Retrofit Assessment
+Corporate Strategy Group | September 2025 | Internal Use Only
+
+Executive Summary
+
+This assessment evaluates the retrofit of battery energy storage systems (BESS) at our two West Texas solar sites, where curtailment during negative-pricing intervals cost an estimated $5.8M in revenue over the trailing twelve months. We recommend proceeding with the board-approved $55M retrofit program covering 80 MWh of storage capacity, with procurement initiated in Q1 2026 and commercial operation targeted for Q1 2027.
+
+Market Context
+
+ERCOT curtailment of utility-scale solar has increased each year since 2022 as West Texas interconnection additions outpace transmission buildout. Negative-pricing intervals in our operating zone occurred in 14% of daylight hours in Q2-Q3 2025, up from 9% a year earlier. Ancillary service markets (ECRS and Non-Spin) continue to offer attractive arbitrage economics for 2-4 hour duration storage, although ancillary prices have compressed roughly 30% from their 2023 peaks and we model further compression of 10-15% annually through 2028.
+
+Battery pack prices declined 19% year-over-year, with current turnkey system quotes at $148/kWh installed. Three of the four vendors we surveyed can meet a Q1 2026 procurement window; all four cite domestic-content bonus eligibility under current tax credit rules, which improves project economics by approximately 10 percentage points of ITC value.
+
+Commercial Rationale
+
+1. Curtailment capture: shifting curtailed midday generation into evening peak windows recovers an estimated $3.2M annually at current spreads.
+2. Ancillary revenue: modeled at $2.1M annually in year one, declining with expected price compression.
+3. PPA positioning: dispatchable capacity strengthens our position in the Ridgeline Utilities pricing discussions and broadens the offtaker pool for uncontracted volumes beyond our current concentration in two counterparties.
+
+Risks and Dependencies
+
+- Interconnection modification approvals for both sites are expected to take 8-11 months through the ERCOT process; applications should be filed no later than November 2025 to protect the Q1 2027 COD target.
+- The retrofit program assumes Talon Grid Services performs balance-of-plant integration under an amendment to the existing O&M framework. Talon has not previously delivered BESS integration scope for us, and we have not benchmarked their pricing against specialist storage EPCs. Given Talon already holds our entire O&M and EPC relationship, awarding this scope sole-source would deepen an existing single-vendor dependence without a market check.
+- Our performance-data infrastructure remains fragmented across three platforms; storage dispatch optimization will require sub-hourly settlement-quality data that current manual reconciliation processes cannot reliably produce. A unified data platform is a prerequisite for capturing the full modeled arbitrage value.
+
+Recommendation
+
+Proceed with the $55M program on the timeline above, subject to: (1) competitive bid of the BESS integration scope including at least two specialist storage EPCs alongside Talon Grid Services; (2) November 2025 interconnection filing; (3) funding the unified data platform initiative currently under COO review as a co-requisite rather than a follow-on.

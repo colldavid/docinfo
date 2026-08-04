@@ -1,0 +1,38 @@
+TO: Executive Leadership Team
+FROM: Chief Operating Officer, Helios Renewables
+DATE: October 9, 2025
+RE: Q3 Operations Review — Fleet Performance and Q4 Priorities
+
+Fleet Performance
+
+Fleet-wide availability for Q3 was 94.1%, below our 97% target and down from 96.8% in Q2. The single largest driver was the main step-up transformer failure at the Sun Mesa Phase I site in August, which took 180 MW offline for 23 days. We did not have a spare transformer on site or under reservation; the replacement unit carried a 19-week lead time from the OEM and we ultimately paid a premium to take a unit allocated to another buyer. We have no critical-spares program for long-lead equipment across the fleet. I am asking asset management to complete a criticality assessment and spares strategy by December 1. This is the second long-lead failure in 18 months and both times we improvised.
+
+Curtailment losses totaled 41 GWh in Q3, roughly $1.6M in lost revenue, concentrated in the West Texas assets during negative-pricing intervals.
+
+Sun Mesa Phase II
+
+Commissioning for Sun Mesa Phase II (220 MW) has slipped from Q2 2026 to Q4 2026. The primary drivers are the transformer lead-time environment described above and Talon Grid Services' revised construction sequencing after the July storm damage to laydown areas. Interconnection remains on track — ERCOT confirmed the facility study will complete by January 2026. I want to be direct: our public communications have not yet been updated to reflect the revised commissioning window, and we should align on messaging before the November earnings call.
+
+Monitoring and Data
+
+Performance engineers are reconciling generation data across three systems — the legacy SCADA historian, the Talon O&M portal, and our settlement platform — by hand, in spreadsheets, every month. Month-end performance reporting consumes roughly 240 engineer-hours monthly and we still found four material reconciliation errors this quarter. There is no unified data platform and no automated validation. This is a process failure, not a people failure, and it is slowing every root-cause analysis we run.
+
+Workforce
+
+O&M technician attrition reached 26% annualized in Q3. Exit interviews are consistent: we have no defined progression from Technician I to lead roles, no published compensation bands, and competitors (primarily oil & gas operators in the Permian) are offering 15-20% above our current rates with clear advancement tracks. We currently staff 240 field technicians across the fleet. Two of our five site supervisors have resigned since July; both cited the absence of any leadership development path. Recruiting is backfilling, but time-to-fill has stretched to 71 days.
+
+Vendor Exposure
+
+Talon Grid Services now holds the O&M agreements for 100% of our operating fleet as well as the Phase II EPC contract. Their performance has been acceptable, but the concentration means we have no benchmark for cost or quality, and any Talon labor action or insolvency event would affect every site simultaneously. We have never run a competitive re-bid on O&M scope since the original 2023 award.
+
+Offtake
+
+Our top two offtakers represent 68% of contracted revenue. The larger, Ridgeline Utilities, has begun discussions about restructuring its 2024 PPA pricing in light of current market rates.
+
+Q4 Priorities
+
+1. Critical spares criticality assessment and procurement strategy (Dec 1)
+2. Unified performance-data platform scoping — RFP draft by Dec 15
+3. Technician career-ladder and compensation-band proposal to ELT (Nov 20)
+4. O&M competitive benchmarking plan for the 2026 renewal window
+5. Aligned external messaging on Phase II timing ahead of the November earnings call

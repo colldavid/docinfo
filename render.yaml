@@ -10,7 +10,7 @@ services:
     name: docinfo
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter          # 512MB RAM is tight for the embedding model; bump to standard if it OOMs
+    plan: standard         # 2GB RAM — the sentence-transformer + torch need ~1.5GB; starter (512MB) OOMs
     healthCheckPath: /health
     envVars:
       - key: ANTHROPIC_API_KEY

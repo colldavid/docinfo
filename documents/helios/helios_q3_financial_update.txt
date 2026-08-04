@@ -1,0 +1,31 @@
+Helios Renewables LLC — Q3 2025 Financial Update
+Prepared for: Board of Directors and Crescent Bank (Administrative Agent)
+Distribution: Restricted — Board and Lender Group Only
+
+Revenue and EBITDA
+
+Q3 revenue was $38.2M, 7% below plan, driven by the Sun Mesa Phase I transformer outage (23 days, 180 MW) and $1.6M of curtailment losses in West Texas. Trailing-twelve-month EBITDA stands at $61.4M against a plan of $68M. The transformer replacement was expedited at a total cost of $3.1M including premium freight and overtime, of which we expect to recover approximately $1.2M under the property policy, subject to the $500K deductible.
+
+Liquidity and Covenants
+
+Cash and equivalents were $24.7M as of September 30, with $15M undrawn on the revolving facility with Crescent Bank. The senior facility carries a debt service coverage ratio covenant of 1.20x, measured December 31, 2026. At current TTM EBITDA we project 1.24x — inside the covenant but with less headroom than underwritten. If Sun Mesa Phase II commissioning slips beyond Q4 2026, projected DSCR at the measurement date falls to approximately 1.14x, which would require either a waiver or an equity cure. We have opened preliminary discussions with Crescent Bank's agency desk.
+
+Sun Mesa Phase II
+
+Phase II construction is 61% complete. Commissioning is now planned for Q4 2026. Capital spend to date is $198M against a $312M total budget; the transformer procurement premium and storm-related rework at Talon Grid Services' laydown areas have consumed $9.4M of the $14M contingency with five quarters of construction remaining.
+
+Storage Retrofit Program
+
+The Board approved a $42M battery storage retrofit budget in September, covering 80 MWh across the two West Texas sites, targeting curtailment capture and ancillary revenue. Procurement begins Q1 2026.
+
+Offtake and Revenue Concentration
+
+Contracted revenue concentration across our top two offtakers stands at 54%. Ridgeline Utilities has requested discussions regarding its 2024 PPA pricing; no formal repricing proposal has been received. Management does not currently expect a material adverse outcome but notes the concentration risk.
+
+Insurance
+
+Property program renewal quotes came in 22% above expiring, reflecting the transformer loss and broader market hardening. We are evaluating a higher deductible structure ($1M vs $500K) to hold premium flat.
+
+Outlook
+
+Full-year 2025 EBITDA guidance is revised to $62-65M from $68-71M. The revision reflects the Q3 outage, curtailment trends, and O&M cost inflation of approximately 6% year-over-year, driven primarily by field labor turnover and contractor backfill costs.
