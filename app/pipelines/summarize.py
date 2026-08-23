@@ -22,7 +22,7 @@ def summarize_document(text: str) -> str:
     try:
         # Same document text → identical summary, replayed from cache.
         return cached_call(
-            ["summarize_v1", text[:3000]],
+            "summarize", SYSTEM_PROMPT, [text[:3000]],
             lambda: call_llm(
                 user_message=f"Document text (truncated):\n{text[:3000]}",
                 system=SYSTEM_PROMPT,

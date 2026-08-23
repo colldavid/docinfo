@@ -70,6 +70,16 @@ export function deliverableUrl(portfolioId: number): string {
   return `${BASE}/portfolios/${portfolioId}/deliverable`;
 }
 
+export async function addRecordsToPortfolio(portfolioId: number, recordIds: number[]): Promise<Portfolio> {
+  const res = await fetch(`${BASE}/portfolios/${portfolioId}/records`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ record_ids: recordIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function createPortfolio(name: string, recordIds: number[]): Promise<Portfolio> {
   const res = await fetch(`${BASE}/portfolios`, {
     method: "POST",

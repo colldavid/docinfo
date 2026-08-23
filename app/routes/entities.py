@@ -74,13 +74,22 @@ Return AT MOST {max_entities} entities, the most substantively involved ones.
 EVENTS — things that happened or are scheduled, ONLY where the document states a \
 concrete date. A date qualifies if it names a day, month, quarter, or year: \
 "March 14", "Q2 2025", "by year-end 2024", "January 2026" all qualify. Vague timing \
-does NOT qualify: "recently", "last quarter", "soon", "in the coming months", "ongoing". \
-If the document gives no concrete date for something, leave it out entirely.
+does NOT qualify: "recently", "soon", "in the coming months", "ongoing".
 
-Copy the date string VERBATIM as the document writes it. Each description must name \
-its subject and be self-contained — "Meridian Health completed the ERP cutover" not \
-"the cutover was completed", because these events will be read in a list mixed with \
-events from other documents. Return AT MOST {max_events} events.
+Dates and years — use the document's own date context:
+  - If the document states a full date, copy it VERBATIM and set "inferred": false.
+  - If a date lacks a year ("March 14", "the June board meeting") or is relative \
+("next quarter", "the coming fiscal year"), RESOLVE it using the document's own \
+date (header date, letterhead, period covered) and other dates it states — e.g. a \
+memo dated October 2025 saying "commissioning next quarter" means Q1 2026. Write \
+the resolved date ("Q1 2026", "March 14, 2026") and set "inferred": true.
+  - If the document gives you no basis to resolve a year, keep the date as written \
+and set "inferred": true. Never invent a year that has no support in the document.
+
+Each description must name its subject and be self-contained — "Meridian Health \
+completed the ERP cutover" not "the cutover was completed", because these events \
+will be read in a list mixed with events from other documents. \
+Return AT MOST {max_events} events.
 
 Document:
 {text}
@@ -97,8 +106,9 @@ Example:
   ],
   "events": [
     {{"date": "March 14, 2025", "description": "Meridian Health signed the SAP \
-implementation contract"}},
-    {{"date": "Q2 2025", "description": "Meridian Health ERP go-live is scheduled"}}
+implementation contract", "inferred": false}},
+    {{"date": "Q2 2025", "description": "Meridian Health ERP go-live is scheduled", \
+"inferred": true}}
   ]
 }}"""
 
@@ -161,7 +171,13 @@ def _extract(filename: str, text: str) -> tuple[list[dict], list[dict]]:
             # unreadable, and a description with no date is not a timeline entry.
             if not date or not description:
                 continue
-            events.append({"date": date, "description": description})
+            events.append({
+                "date": date,
+                "description": description,
+                # Marks dates the model resolved from context rather than
+                # copied verbatim — the UI shows these as "(inferred)".
+                "inferred": bool(item.get("inferred", False)),
+            })
 
     return entities, events
 
@@ -275,13 +291,18 @@ def _date_sort_key(date: str) -> tuple[int, int, int] | None:
     return None
 
 
-def _sort_events(events: list[dict]) -> list[dict]:
-    """
-    Chronological where the date is parseable, original order where it is not.
+MAX_UNDATED = 10
 
-    Unparseable dates go last rather than being dropped: "by year-end" attached
-    to a real commitment is still worth showing, just not worth placing on the
-    rail between two known dates.
+
+def _sort_events(events: list[dict]) -> tuple[list[dict], list[dict]]:
+    """
+    (chronological_events, undated_events).
+
+    Events whose dates can't be anchored to a year are returned SEPARATELY, not
+    appended after the dated timeline — interleaving "May" after "Nov 2030"
+    reads as a chronological claim we can't actually make. The UI renders them
+    in their own "Undated" strip. Most yearless dates never reach here anymore:
+    the extraction prompt resolves them from document context (marked inferred).
     """
     dated = []
     undated = []
@@ -297,8 +318,10 @@ def _sort_events(events: list[dict]) -> list[dict]:
     dated.sort(key=lambda t: (t[0], t[1]))
     undated.sort(key=lambda t: t[0])
 
-    ordered = [event for _, _, event in dated] + [event for _, event in undated]
-    return ordered[:MAX_EVENTS]
+    return (
+        [event for _, _, event in dated][:MAX_EVENTS],
+        [event for _, event in undated][:MAX_UNDATED],
+    )
 
 
 def compute_and_store(portfolio, session) -> dict:
@@ -332,9 +355,11 @@ def compute_and_store(portfolio, session) -> dict:
                 "source": filename,
             })
 
+    events, undated_events = _sort_events(all_events)
     result = {
         "entities": _merge_entities(entities_per_doc),
-        "events": _sort_events(all_events),
+        "events": events,
+        "undated_events": undated_events,
     }
 
     portfolio.entities_json = json.dumps(result)
@@ -375,6 +400,9 @@ def extract_entities(portfolio_id: int, refresh: bool = False):
                     return {
                         "entities": cached.get("entities", []),
                         "events": cached.get("events", []),
+                        # Older cached results predate the dated/undated split;
+                        # .get keeps them readable until a refresh recomputes.
+                        "undated_events": cached.get("undated_events", []),
                         "checked_docs": min(len(usable), MAX_DOCS),
                         "skipped_docs": len(records) - min(len(usable), MAX_DOCS),
                         "cached": True,

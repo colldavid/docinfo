@@ -41,6 +41,7 @@ def record_to_dict(r: ClassificationRecord) -> dict:
         "summary": r.summary,
         "user_doc_type": r.user_doc_type,
         "user_industry": r.user_industry,
+        "portfolio_id": r.portfolio_id,
         "error": r.error,
     }
 

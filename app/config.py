@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # Pain point matching threshold (cosine similarity)
     pain_point_threshold: float = 0.40
 
+    # LLM result cache size bound (~1000 documents' worth). Disk hygiene, not a
+    # performance need — oldest entries evicted first.
+    llm_cache_max_entries: int = 5000
+
     # Consistency check: re-run count when importance confidence < threshold
     consistency_check_confidence_threshold: float = 0.4
     consistency_check_runs: int = 2

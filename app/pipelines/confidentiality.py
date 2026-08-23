@@ -247,7 +247,7 @@ def classify_confidentiality(text: str) -> dict[str, Any]:
     """
     # Same document → identical result, including any consistency-check outcome.
     return cached_call(
-        ["confidentiality_v1", text[:3000]],
+        "confidentiality", SYSTEM_PROMPT, [text[:3000]],
         lambda: _classify_uncached(text),
     )
 

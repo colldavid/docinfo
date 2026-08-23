@@ -13,11 +13,13 @@ interface TimelineEvent {
   date: string;
   description: string;
   source: string;
+  inferred?: boolean;
 }
 
 interface EntitiesResponse {
   entities: Entity[];
   events: TimelineEvent[];
+  undated_events?: TimelineEvent[];
   checked_docs: number;
   skipped_docs: number;
   cached: boolean;
@@ -106,6 +108,26 @@ export function EntitiesTimeline({ portfolioId }: { portfolioId: number }) {
               <div className={styles.timeline}>
                 {result.events.map((ev, i) => (
                   <div key={i} className={styles.event}>
+                    <span className={styles.eventDate}>
+                      {ev.date}
+                      {ev.inferred && <span className={styles.inferred} title="Date resolved from document context, not stated verbatim"> (inferred)</span>}
+                    </span>
+                    <div className={styles.eventBody}>
+                      <span className={styles.eventText}>{ev.description}</span>
+                      <span className={styles.eventSource}>{ev.source}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(result.undated_events?.length ?? 0) > 0 && (
+            <div className={styles.block}>
+              <p className={styles.blockLabel}>Undated</p>
+              <div className={styles.timeline}>
+                {result.undated_events!.map((ev, i) => (
+                  <div key={i} className={`${styles.event} ${styles.eventUndated}`}>
                     <span className={styles.eventDate}>{ev.date}</span>
                     <div className={styles.eventBody}>
                       <span className={styles.eventText}>{ev.description}</span>

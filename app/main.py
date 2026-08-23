@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 
 from app.classify import classify_document
-from app.database import ClassificationRecord, Portfolio, get_session, init_db
+from app.database import ClassificationRecord, DocumentChunk, Portfolio, get_session, init_db
 from app.ingestion import parse_document
 from app.persistence import persist_record as _persist_record, record_to_dict as _record_to_dict
 from app.pipelines.action_items import suggest_action_items
@@ -238,11 +238,18 @@ def list_results(limit: int = 50, offset: int = 0):
 
 @app.delete("/results")
 def clear_results():
-    """Delete all classification results."""
+    """
+    Delete all classification results AND their stored document content.
+
+    Chunks must be deleted explicitly: SQLite does not enforce the FK cascade
+    here, and leaving them behind would keep sensitive document text on disk
+    after the user believes it was cleared.
+    """
     with get_session() as session:
+        chunks_removed = session.query(DocumentChunk).delete()
         session.query(ClassificationRecord).delete()
         session.commit()
-    return {"deleted": True}
+    return {"deleted": True, "chunks_removed": chunks_removed}
 
 
 @app.get("/search")
@@ -374,10 +381,23 @@ def create_portfolio(body: dict):
         session.refresh(portfolio)
         portfolio_id = portfolio.id
 
-    # Precompute contradictions + entities so the first portfolio view is instant.
-    # Concurrent (each analysis fans out its own LLM calls), each in its OWN
-    # session — SQLAlchemy sessions are not thread-safe. Non-fatal: the endpoints
-    # can always compute on demand.
+    _recompute_portfolio_analyses(portfolio_id)
+
+    with get_session() as session:
+        portfolio = session.get(Portfolio, portfolio_id)
+        return JSONResponse(status_code=201, content=_portfolio_to_dict(portfolio, include_records=True))
+
+
+def _recompute_portfolio_analyses(portfolio_id: int) -> None:
+    """
+    (Re)compute contradictions + entities for a portfolio so the next view is
+    instant. Concurrent (each analysis fans out its own LLM calls), each in its
+    OWN session — SQLAlchemy sessions are not thread-safe. Non-fatal: the
+    endpoints can always compute on demand.
+
+    Shared by portfolio creation and add-documents, which keeps the cached
+    analyses in lockstep with membership — the only mutation path recomputes.
+    """
     from app.routes.contradictions import compute_and_store as _compute_contradictions
     from app.routes.entities import compute_and_store as _compute_entities
 
@@ -394,9 +414,56 @@ def create_portfolio(body: dict):
         pool.submit(_precompute, _compute_contradictions, "Contradiction")
         pool.submit(_precompute, _compute_entities, "Entity")
 
+
+@app.post("/portfolios/{portfolio_id}/records", status_code=200)
+def add_records_to_portfolio(portfolio_id: int, body: dict):
+    """
+    Add classified documents to an existing portfolio.
+    Body: { "record_ids": [int] }
+
+    Per-document analysis is untouched (it belongs to the documents). The three
+    portfolio-owned artifacts are refreshed: theme is re-synthesized from the
+    new full member list, and contradictions + entities are recomputed.
+    """
+    record_ids = body.get("record_ids", [])
+    if not record_ids:
+        raise HTTPException(status_code=422, detail="record_ids must be non-empty")
+
     with get_session() as session:
         portfolio = session.get(Portfolio, portfolio_id)
-        return JSONResponse(status_code=201, content=_portfolio_to_dict(portfolio, include_records=True))
+        if not portfolio:
+            raise HTTPException(status_code=404, detail="Portfolio not found")
+
+        records = session.query(ClassificationRecord).filter(
+            ClassificationRecord.id.in_(record_ids)
+        ).all()
+        if len(records) != len(set(record_ids)):
+            raise HTTPException(status_code=404, detail="One or more records not found")
+
+        claimed = [r.filename for r in records
+                   if r.portfolio_id is not None and r.portfolio_id != portfolio_id]
+        if claimed:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Already in another portfolio: {', '.join(claimed)}",
+            )
+
+        for r in records:
+            r.portfolio_id = portfolio_id
+
+        # Theme is derived from member summaries, so membership change = new theme.
+        # (Its LLM cache keys on the summary list, so an identical membership
+        # would replay rather than re-spend.)
+        all_summaries = [r.summary for r in portfolio.records if r.summary]
+        portfolio.theme = synthesize_theme(all_summaries)
+
+        session.commit()
+
+    _recompute_portfolio_analyses(portfolio_id)
+
+    with get_session() as session:
+        portfolio = session.get(Portfolio, portfolio_id)
+        return _portfolio_to_dict(portfolio, include_records=True)
 
 
 @app.get("/portfolios")

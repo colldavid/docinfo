@@ -121,6 +121,80 @@
 .statCount { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; color: var(--text-primary); min-width: 1.5rem; }
 .statKey { font-size: 0.8rem; color: var(--text-secondary); }
 
+/* Add-documents panel */
+.addPanel {
+  border: 1px solid var(--accent);
+  background: var(--bg-card);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.addList {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.25rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.addRow:last-child { border-bottom: none; }
+.addRow input { accent-color: var(--accent); cursor: pointer; }
+
+.addFilename {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addMeta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.addActions { display: flex; gap: 0.5rem; }
+
+.addConfirmBtn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  background: none;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.addConfirmBtn:hover:not(:disabled) { opacity: 0.75; }
+.addConfirmBtn:disabled { opacity: 0.4; cursor: default; }
+
+.addCancelBtn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border-subtle);
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.addHint { font-size: 0.8rem; color: var(--text-muted); }
+.addError { font-size: 0.8rem; color: var(--error); }
+
 .painThemes {
   border: 1px solid var(--border-subtle);
   background: var(--bg-card);

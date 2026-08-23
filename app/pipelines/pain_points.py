@@ -108,9 +108,6 @@ Example:
   }}
 ]"""
 
-# Bump when the prompt or output shape changes, so stale cache entries don't replay.
-_CACHE_VERSION = "pain_points_v3"
-
 # Prototype embedding matrix — computed once per process, order matches BROAD_CATEGORIES.
 _prototype_matrix: np.ndarray | None = None
 
@@ -181,7 +178,7 @@ def detect_pain_points(
 ) -> list[dict]:
     try:
         points = cached_call(
-            [_CACHE_VERSION, text[:6000]],
+            "pain_points", EXTRACT_PROMPT, [text[:6000]],
             lambda: _extract_pain_points(text),
         )
         logger.debug(f"Pain points ({len(points)}): {[p['label'] for p in points]}")

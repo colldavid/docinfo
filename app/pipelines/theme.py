@@ -30,7 +30,7 @@ def synthesize_theme(summaries: list[str]) -> str:
     try:
         bullet_list = "\n".join(f"- {s}" for s in summaries if s)
         # Same set of summaries → identical theme, replayed from cache.
-        return cached_call(["theme_v1", bullet_list], lambda: _synthesize(bullet_list))
+        return cached_call("theme", SYSTEM_PROMPT, [bullet_list], lambda: _synthesize(bullet_list))
     except Exception as e:
         logger.warning(f"Theme synthesis failed: {e}")
         return ""

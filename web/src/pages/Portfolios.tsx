@@ -30,6 +30,14 @@ export function Portfolios() {
     if (selected?.id === id) setSelected(null);
   }
 
+  async function refreshSelected() {
+    if (!selected) return;
+    const full = await fetchPortfolio(selected.id);
+    setSelected(full);
+    // Keep the list row's doc count in sync with the refreshed portfolio.
+    setPortfolios((prev) => prev.map((p) => p.id === full.id ? { ...p, record_count: full.record_count } : p));
+  }
+
   if (loading) return <p className={styles.muted}>Loading…</p>;
   if (error) return <div className={styles.error}>Error: {error}</div>;
 
@@ -69,6 +77,7 @@ export function Portfolios() {
                   <PortfolioView
                     portfolio={selected}
                     records={selected.records}
+                    onChanged={refreshSelected}
                   />
                 </div>
               )}

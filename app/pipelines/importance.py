@@ -252,7 +252,7 @@ def classify_importance(
     # and confidentiality — so identical inputs replay the identical verdict.
     pain_labels = sorted(str(p.get("label", "")) for p in pain_points)
     return cached_call(
-        ["importance_v1", text[:3000], "|".join(pain_labels), confidentiality_label],
+        "importance", SYSTEM_PROMPT, [text[:3000], "|".join(pain_labels), confidentiality_label],
         lambda: _classify_uncached(text, pain_points, confidentiality_label),
     )
 

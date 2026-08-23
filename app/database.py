@@ -115,6 +115,10 @@ class LLMCache(Base):
     __tablename__ = "llm_cache"
 
     key = Column(String(64), primary_key=True)
+    # Metadata enabling targeted invalidation: when a pipeline's prompt changes,
+    # its old-prompt rows are purged (see llm_cache._purge_stale).
+    pipeline = Column(String(64))
+    prompt_hash = Column(String(16))
     value = Column(Text, nullable=False)  # JSON-encoded pipeline result
     created_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -142,6 +146,8 @@ _MIGRATIONS = [
     ("classifications", "user_industry", "VARCHAR"),
     ("portfolios", "contradictions_json", "TEXT"),
     ("portfolios", "entities_json", "TEXT"),
+    ("llm_cache", "pipeline", "VARCHAR"),
+    ("llm_cache", "prompt_hash", "VARCHAR"),
 ]
 
 

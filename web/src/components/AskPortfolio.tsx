@@ -23,6 +23,7 @@ interface Exchange {
 
 export function AskPortfolio({ portfolioId }: { portfolioId: number }) {
   const [question, setQuestion] = useState("");
+  const [deep, setDeep] = useState(false);
   const [history, setHistory] = useState<Exchange[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function AskPortfolio({ portfolioId }: { portfolioId: number }) {
       const res = await fetch(`${BASE}/portfolios/${portfolioId}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, deep }),
       });
 
       if (!res.ok) {
@@ -94,6 +95,11 @@ export function AskPortfolio({ portfolioId }: { portfolioId: number }) {
           Ask
         </button>
       </div>
+
+      <label className={styles.deepToggle} title="Search 20 excerpts instead of 8 — for answers scattered across many documents">
+        <input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} />
+        deep search
+      </label>
 
       {loading && <p className={styles.loading}>Searching documents…</p>}
       {notice && <p className={styles.notice}>{notice}</p>}

@@ -1,20 +1,103 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ClassificationRecord, Portfolio } from "../types";
 import { ResultsTable } from "./ResultsTable";
 import { ResultDetail } from "./ResultDetail";
 import { Contradictions } from "./Contradictions";
 import { EntitiesTimeline } from "./EntitiesTimeline";
 import { AskPortfolio } from "./AskPortfolio";
-import { deliverableUrl, exportCsvUrl } from "../api";
+import { addRecordsToPortfolio, deliverableUrl, exportCsvUrl, fetchResults } from "../api";
 import styles from "./PortfolioView.module.css";
 
 interface Props {
   portfolio: Portfolio;
   records: ClassificationRecord[];
+  /** Called after documents are added so the parent can refetch the portfolio. */
+  onChanged?: () => void;
 }
 
-export function PortfolioView({ portfolio, records }: Props) {
+function AddDocsPanel({ portfolioId, onDone, onCancel }: {
+  portfolioId: number;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [candidates, setCandidates] = useState<ClassificationRecord[] | null>(null);
+  const [chosen, setChosen] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Only documents not already in a portfolio are offered.
+    fetchResults()
+      .then((rs) => setCandidates(rs.filter((r) => r.portfolio_id == null && !r.error)))
+      .catch(() => setCandidates([]));
+  }, []);
+
+  function toggle(id: number) {
+    setChosen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleAdd() {
+    setBusy(true);
+    setError(null);
+    try {
+      await addRecordsToPortfolio(portfolioId, [...chosen]);
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Adding documents failed.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={styles.addPanel}>
+      {candidates === null && <p className={styles.addHint}>Loading unassigned documents…</p>}
+      {candidates !== null && candidates.length === 0 && (
+        <p className={styles.addHint}>
+          No unassigned documents. Classify new files first — documents already in a portfolio can't be moved.
+        </p>
+      )}
+      {candidates !== null && candidates.length > 0 && (
+        <>
+          <div className={styles.addList}>
+            {candidates.map((r) => (
+              <label key={r.id} className={styles.addRow}>
+                <input
+                  type="checkbox"
+                  checked={chosen.has(r.id)}
+                  onChange={() => toggle(r.id)}
+                  disabled={busy}
+                />
+                <span className={styles.addFilename}>{r.filename}</span>
+                <span className={styles.addMeta}>{r.document_type?.label ?? "—"}</span>
+              </label>
+            ))}
+          </div>
+          {error && <p className={styles.addError}>{error}</p>}
+          <div className={styles.addActions}>
+            <button className={styles.addConfirmBtn} onClick={handleAdd} disabled={busy || chosen.size === 0}>
+              {busy ? "Adding & re-analyzing…" : `Add ${chosen.size || ""} document${chosen.size === 1 ? "" : "s"}`}
+            </button>
+            <button className={styles.addCancelBtn} onClick={onCancel} disabled={busy}>Cancel</button>
+          </div>
+          {busy && (
+            <p className={styles.addHint}>
+              Theme, contradictions, and entities are being recomputed — this takes a few seconds.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+export function PortfolioView({ portfolio, records, onChanged }: Props) {
   const [selected, setSelected] = useState<ClassificationRecord | null>(null);
+  const [adding, setAdding] = useState(false);
   const detailRef = useRef<HTMLDivElement>(null);
 
   function handleSelect(r: ClassificationRecord) {
@@ -45,10 +128,23 @@ export function PortfolioView({ portfolio, records }: Props) {
           </p>
         </div>
         <div className={styles.actions}>
+          {onChanged && (
+            <button className={styles.exportBtn} onClick={() => setAdding((v) => !v)}>
+              {adding ? "Close" : "Add documents"}
+            </button>
+          )}
           <a href={deliverableUrl(portfolio.id)} target="_blank" rel="noopener" className={styles.exportBtn}>Deliverable (PDF)</a>
           <a href={exportCsvUrl(portfolio.id)} download className={styles.exportBtn}>Export CSV</a>
         </div>
       </div>
+
+      {adding && (
+        <AddDocsPanel
+          portfolioId={portfolio.id}
+          onDone={() => { setAdding(false); onChanged?.(); }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
 
       {/* Theme */}
       {portfolio.theme && (

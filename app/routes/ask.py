@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Retrieval / response shaping
-TOP_K = 8            # chunks fed to the LLM
+TOP_K = 8            # chunks fed to the LLM (default mode)
+TOP_K_DEEP = 20      # "deep" mode — wider context for scattered-answer questions
 MAX_SOURCES = 5      # citation chips returned to the UI (deduped by filename)
 EXCERPT_CHARS = 220  # excerpt length in the response payload
 
@@ -50,6 +51,7 @@ SYSTEM_PROMPT = (
 
 class AskRequest(BaseModel):
     question: str
+    deep: bool = False  # widen retrieval from 8 to 20 chunks
 
 
 @router.post("/portfolios/{portfolio_id}/ask")
@@ -82,10 +84,11 @@ def ask_portfolio(portfolio_id: int, body: AskRequest):
         raise HTTPException(status_code=409, detail=NO_CHUNKS_DETAIL)
 
     # --- Retrieval (local, no API call) ---------------------------------
+    top_k = TOP_K_DEEP if body.deep else TOP_K
     query_vec = embed_one(question)
     corpus = np.stack([vector_from_bytes(r[1]) for r in rows])
     scores = cosine_similarity_matrix(query_vec, corpus)
-    top_indices = np.argsort(scores)[::-1][:TOP_K]
+    top_indices = np.argsort(scores)[::-1][:top_k]
     top_rows = [rows[int(i)] for i in top_indices]
 
     # --- Synthesis ------------------------------------------------------

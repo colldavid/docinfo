@@ -122,6 +122,15 @@
   line-height: 1.5;
 }
 
+.inferred {
+  color: var(--text-muted);
+  letter-spacing: 0;
+  font-style: italic;
+}
+
+.eventUndated .eventDate { color: var(--text-muted); }
+.eventUndated { opacity: 0.85; }
+
 .eventBody {
   display: flex;
   flex-direction: column;
