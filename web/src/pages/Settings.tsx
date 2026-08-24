@@ -15,6 +15,8 @@ interface EffectiveSettings {
   doc_type_review_threshold: string;
   industry_review_threshold: string;
   watch_dir: string;
+  firm_domains: string;
+  screen_api_key: string;
 }
 
 interface SettingsResponse {
@@ -22,6 +24,7 @@ interface SettingsResponse {
   provider_keys: Record<Provider, boolean>;
   model_suggestions: Record<Provider, string[]>;
   cache_entries: number;
+  screening_configured: boolean;
 }
 
 /** Only the fields this page owns — watch_dir is deliberately not rendered here. */
@@ -30,7 +33,9 @@ type EditableKey =
   | "llm_model"
   | "llm_base_url"
   | "doc_type_review_threshold"
-  | "industry_review_threshold";
+  | "industry_review_threshold"
+  | "firm_domains"
+  | "screen_api_key";
 
 const EDITABLE_KEYS: EditableKey[] = [
   "llm_provider",
@@ -38,7 +43,33 @@ const EDITABLE_KEYS: EditableKey[] = [
   "llm_base_url",
   "doc_type_review_threshold",
   "industry_review_threshold",
+  "firm_domains",
+  "screen_api_key",
 ];
+
+const SCREEN_KEY_LENGTH = 24;
+const SCREEN_KEY_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+/**
+ * A random key the operator can paste straight into the add-in config.
+ * Rejection sampling keeps the alphabet uniform — the obvious `% length` would
+ * bias toward the first few characters, which is a silly way to weaken a secret.
+ */
+function generateScreenKey(): string {
+  const max = 256 - (256 % SCREEN_KEY_ALPHABET.length);
+  const out: string[] = [];
+  const buf = new Uint8Array(SCREEN_KEY_LENGTH);
+  while (out.length < SCREEN_KEY_LENGTH) {
+    crypto.getRandomValues(buf);
+    for (const byte of buf) {
+      if (byte < max && out.length < SCREEN_KEY_LENGTH) {
+        out.push(SCREEN_KEY_ALPHABET[byte % SCREEN_KEY_ALPHABET.length]);
+      }
+    }
+  }
+  return out.join("");
+}
 
 const THRESHOLD_KEYS = new Set<EditableKey>([
   "doc_type_review_threshold",
@@ -59,6 +90,8 @@ function toForm(s: EffectiveSettings): Form {
     llm_base_url: s.llm_base_url,
     doc_type_review_threshold: s.doc_type_review_threshold,
     industry_review_threshold: s.industry_review_threshold,
+    firm_domains: s.firm_domains,
+    screen_api_key: s.screen_api_key,
   };
 }
 
@@ -133,7 +166,13 @@ export function Settings() {
       const next = payload as EffectiveSettings;
       setForm(toForm(next));
       setSaved(toForm(next));
-      setData((d) => (d ? { ...d, settings: next } : d));
+      // PATCH returns the settings only, so recompute screening_configured here
+      // rather than leaving the "disabled" warning stale until the next reload.
+      setData((d) =>
+        d
+          ? { ...d, settings: next, screening_configured: next.screen_api_key !== "" }
+          : d
+      );
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 2500);
     } catch (e) {
@@ -307,6 +346,68 @@ export function Settings() {
             />
             <p className={styles.hint}>Flag for human review below this confidence.</p>
           </div>
+        </div>
+      </section>
+
+      {/* ── Email screening ──────────────────────────────────────────────── */}
+      {/* Sits above the save row with the other editable settings: these fields
+          are saved by that button, and rendering them below it read as if they
+          were a separate, self-applying control. */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Email screening</h2>
+        <p className={styles.sectionNote}>
+          Checks outbound Outlook messages for sensitive attachments before they're
+          sent. Warn-only — screening never blocks a send.
+        </p>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="firm_domains">Internal domains</label>
+          <input
+            id="firm_domains"
+            className={styles.input}
+            value={form.firm_domains}
+            onChange={(e) => update("firm_domains", e.target.value)}
+            placeholder="accenture.com, client-subsidiary.com"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <p className={styles.hint}>
+            Comma-separated. Recipients on any other domain count as external, which
+            is what a warning is based on. Leave empty and every recipient is treated
+            as external — noisier, but never misses.
+          </p>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="screen_api_key">Add-in key</label>
+          <div className={styles.inputRow}>
+            <input
+              id="screen_api_key"
+              className={styles.input}
+              value={form.screen_api_key}
+              onChange={(e) => update("screen_api_key", e.target.value)}
+              placeholder="not configured — screening disabled"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              className={styles.generateBtn}
+              onClick={() => update("screen_api_key", generateScreenKey())}
+            >
+              Generate
+            </button>
+          </div>
+          <p className={styles.hint}>
+            The Outlook add-in must send this key. Minimum 8 characters. Leave empty
+            to disable the screening endpoint.
+          </p>
+          {!data.screening_configured && (
+            <p className={styles.warn}>
+              Screening is currently disabled — the endpoint returns 503 until a key
+              is saved.
+            </p>
+          )}
         </div>
       </section>
 

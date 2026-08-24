@@ -102,6 +102,39 @@
   padding: 0.05rem 0.3rem;
 }
 
+/* Input paired with an adjacent action button (generate key). */
+.inputRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* The input caps at 32rem on its own; inside the row it should take the space
+   the button leaves rather than sitting at its intrinsic width. */
+.inputRow .input {
+  flex: 1 1 18rem;
+}
+
+.generateBtn {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--border-subtle);
+  padding: 0 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.generateBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .thresholdGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

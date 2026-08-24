@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>DocInfo Send Screening</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script src="screen.js"></script>
+  </head>
+  <body>
+    <!--
+      There is no UI here and nothing to see: this page never becomes visible. It exists
+      because Outlook on the web, on Mac, and new Outlook on Windows run send handlers in
+      a browser runtime that loads this HTML file (the manifest's SourceLocation), which
+      in turn loads screen.js. Classic Outlook on Windows ignores this page entirely and
+      loads screen.js directly in a JavaScript-only runtime via the manifest's
+      <Override type="javascript"> element. Both paths must stay wired up for the add-in
+      to work everywhere.
+    -->
+  </body>
+</html>

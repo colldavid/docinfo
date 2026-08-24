@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DocInfo Send Screening - classic (add-in only) XML manifest.
+
+  Every deployable URL below points at https://YOUR-DOCINFO-SERVER. Find-replace that
+  one placeholder with your real HTTPS host to configure the whole file. See README.md.
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+
+  <Id>979c9952-6fc0-4a69-96d4-8bfc0c6c7907</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>DocInfo</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="DocInfo Send Screening" />
+  <Description DefaultValue="Screens outgoing attachments and recipients for confidentiality risks before a message is sent, warning the sender when a document may not be appropriate for its audience." />
+  <IconUrl DefaultValue="https://YOUR-DOCINFO-SERVER/addin/icon-64.png" />
+  <HighResolutionIconUrl DefaultValue="https://YOUR-DOCINFO-SERVER/addin/icon-128.png" />
+  <SupportUrl DefaultValue="https://YOUR-DOCINFO-SERVER/" />
+
+  <AppDomains>
+    <AppDomain>https://YOUR-DOCINFO-SERVER</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.1" />
+    </Sets>
+  </Requirements>
+
+  <!-- Base (pre-VersionOverrides) form settings. Required by the schema even though
+       this add-in has no task pane; older clients that ignore VersionOverrides simply
+       show nothing. -->
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://YOUR-DOCINFO-SERVER/addin/screen.html" />
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <Permissions>ReadWriteItem</Permissions>
+
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
+  </Rule>
+
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+
+      <!-- Smart Alerts (OnMessageSend) shipped in Mailbox 1.12. We require 1.12 as the
+           true functional minimum so the add-in still activates on clients that never
+           advanced past it. -->
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.12">
+          <bt:Set Name="Mailbox" />
+        </bt:Sets>
+      </Requirements>
+
+      <Hosts>
+        <Host xsi:type="MailHost">
+
+          <!-- Event-based activation runs in a lightweight runtime. -->
+          <Runtimes>
+            <!-- Browser runtime (Outlook on the web, Mac, new Outlook on Windows):
+                 loads the HTML page, which pulls in screen.js. -->
+            <Runtime resid="WebViewRuntime.Url">
+              <!-- JavaScript-only runtime (classic Outlook on Windows): loads the JS
+                   file directly, ignoring the HTML. -->
+              <Override type="javascript" resid="JSRuntime.Url" />
+            </Runtime>
+          </Runtimes>
+
+          <DesktopFormFactor>
+            <FunctionFile resid="WebViewRuntime.Url" />
+
+            <!-- Run our handler when the user sends a message. SendMode="PromptUser"
+                 means the warning dialog always offers "Send Anyway": we inform the
+                 sender, we never block them. -->
+            <ExtensionPoint xsi:type="LaunchEvent">
+              <LaunchEvents>
+                <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="PromptUser" />
+              </LaunchEvents>
+              <!-- Must match the Runtime element representing the browser runtime. -->
+              <SourceLocation resid="WebViewRuntime.Url" />
+            </ExtensionPoint>
+          </DesktopFormFactor>
+
+        </Host>
+      </Hosts>
+
+      <Resources>
+        <bt:Images>
+          <bt:Image id="Icon.16x16" DefaultValue="https://YOUR-DOCINFO-SERVER/addin/icon-16.png" />
+          <bt:Image id="Icon.32x32" DefaultValue="https://YOUR-DOCINFO-SERVER/addin/icon-32.png" />
+          <bt:Image id="Icon.64x64" DefaultValue="https://YOUR-DOCINFO-SERVER/addin/icon-64.png" />
+          <bt:Image id="Icon.80x80" DefaultValue="https://YOUR-DOCINFO-SERVER/addin/icon-80.png" />
+          <bt:Image id="Icon.128x128" DefaultValue="https://YOUR-DOCINFO-SERVER/addin/icon-128.png" />
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="WebViewRuntime.Url" DefaultValue="https://YOUR-DOCINFO-SERVER/addin/screen.html" />
+          <!-- Entry needed for classic Outlook on Windows. -->
+          <bt:Url id="JSRuntime.Url" DefaultValue="https://YOUR-DOCINFO-SERVER/addin/screen.js" />
+        </bt:Urls>
+      </Resources>
+
+    </VersionOverrides>
+  </VersionOverrides>
+
+</OfficeApp>

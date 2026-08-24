@@ -26,6 +26,12 @@ ALLOWED_KEYS = {
     "doc_type_review_threshold": lambda: settings.doc_type_review_threshold,
     "industry_review_threshold": lambda: settings.industry_review_threshold,
     "watch_dir": lambda: "",
+    # Email screening (/screen + Outlook add-in). firm_domains: comma-separated
+    # internal domains — recipients outside them count as external. screen_api_key:
+    # shared secret the add-in presents; empty = screening endpoint disabled.
+    # (App-issued credential, not a provider secret — deliberately runtime-settable, D6.)
+    "firm_domains": lambda: "",
+    "screen_api_key": lambda: "",
 }
 
 

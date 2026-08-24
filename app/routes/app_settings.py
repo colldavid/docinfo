@@ -7,10 +7,15 @@ restarting. Everything is written through app.runtime_settings, which layers an
 allowlisted key/value store (app_settings table) over the .env-backed pydantic
 Settings object.
 
-Security: API keys are NEVER settable or readable here. The GET response only
-reports *whether* each provider's key is present as a boolean, so the UI can
-grey out a provider you can't actually switch to. Key material never leaves the
-environment.
+Security: *provider* API keys are NEVER settable or readable here. The GET
+response only reports *whether* each provider's key is present as a boolean, so
+the UI can grey out a provider you can't actually switch to. Provider key
+material never leaves the environment.
+
+The screening key (screen_api_key) is the one deliberate exception — see the
+comment on SCREEN_API_KEY_MIN_LENGTH. It is app-issued rather than a third-party
+secret, and the operator has to be able to read it back to paste it into the
+Outlook add-in.
 
 Also exposes cache maintenance: the LLM cache makes repeat classification of an
 unchanged document byte-identical and free, so clearing it is a deliberate
@@ -25,6 +30,7 @@ protects — no per-route auth needed here.
 """
 
 import logging
+import re
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -56,6 +62,43 @@ MODEL_SUGGESTIONS = {
 }
 
 
+# A domain label set, not a hostname parser: lowercase alphanumerics, dots and
+# hyphens only. Anything with an "@", a space, or no dot at all is far more
+# likely to be a pasted email address or a typo than an internal domain, and
+# silently accepting it would silently mark every recipient external.
+_DOMAIN_RE = re.compile(r"^[a-z0-9.-]+$")
+
+# Below this length a shared secret is guessable enough that "screening is on"
+# would be misleading. 8 is a floor, not an endorsement — the UI's generate
+# button produces 24.
+SCREEN_API_KEY_MIN_LENGTH = 8
+
+
+def _validate_firm_domains(raw: str) -> str:
+    """
+    Normalise "Accenture.COM , accenture.mx" to "accenture.com,accenture.mx".
+
+    Returns the canonical stored form. Empty input is valid and means
+    "unconfigured" — the caller treats that as every recipient being external.
+    """
+    parts = [part.strip().lower() for part in str(raw).split(",")]
+    domains = [part for part in parts if part]
+
+    for domain in domains:
+        if "@" in domain or not _DOMAIN_RE.match(domain) or "." not in domain:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"'{domain}' is not a valid domain. Use bare domains separated "
+                    "by commas, e.g. 'accenture.com, accenture.mx'."
+                ),
+            )
+
+    # De-duplicate while preserving the operator's ordering, so a paste with a
+    # repeated domain round-trips to something stable in the UI.
+    return ",".join(dict.fromkeys(domains))
+
+
 def _provider_keys() -> dict[str, bool]:
     """Which providers have a usable API key in the environment. Booleans only."""
     return {
@@ -74,12 +117,24 @@ def get_settings():
     """
     Current effective settings plus the context the UI needs to render safely:
     which providers are actually usable, model suggestions, and cache size.
+
+    Note for reviewers: `settings` carries screen_api_key in the clear, unlike
+    the provider keys above. That is deliberate, not an oversight. A provider key
+    is a third-party secret we only ever need to *use*, so it stays in the
+    environment and is reported as a boolean. screen_api_key is a credential this
+    app issues, and the operator must be able to read it back to paste it into
+    the Outlook add-in's configuration — a write-only field would make the
+    feature unusable. /settings already sits behind app.main's auth middleware,
+    so the exposure is to authenticated operators only.
     """
+    effective = runtime_settings.effective()
     return {
-        "settings": runtime_settings.effective(),
+        "settings": effective,
         "provider_keys": _provider_keys(),
         "model_suggestions": MODEL_SUGGESTIONS,
         "cache_entries": _cache_entries(),
+        # Saves every caller a string comparison to answer "is screening live?".
+        "screening_configured": bool(effective.get("screen_api_key", "")),
     }
 
 
@@ -91,6 +146,8 @@ class SettingsPatch(BaseModel):
     doc_type_review_threshold: Optional[float] = None
     industry_review_threshold: Optional[float] = None
     watch_dir: Optional[str] = None
+    firm_domains: Optional[str] = None
+    screen_api_key: Optional[str] = None
 
 
 def _validate_threshold(name: str, value: float) -> str:
@@ -171,6 +228,26 @@ def patch_settings(body: SettingsPatch):
         # No existence check — the watcher reports an unreadable path itself,
         # and the directory may legitimately be created after it's configured.
         writes["watch_dir"] = str(provided["watch_dir"]).strip()
+
+    if "firm_domains" in provided:
+        # Empty is valid and meaningful: unconfigured, so every recipient counts
+        # as external and screening warns on all of them.
+        writes["firm_domains"] = _validate_firm_domains(provided["firm_domains"])
+
+    if "screen_api_key" in provided:
+        key = str(provided["screen_api_key"]).strip()
+        # Empty disables screening outright, which is a safe state. A *short*
+        # key is the dangerous one: it leaves the endpoint serving document
+        # content behind a secret worth guessing.
+        if key and len(key) < SCREEN_API_KEY_MIN_LENGTH:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"screen_api_key must be at least {SCREEN_API_KEY_MIN_LENGTH} "
+                    "characters, or empty to disable screening."
+                ),
+            )
+        writes["screen_api_key"] = key
 
     # ── Apply ──────────────────────────────────────────────────────────────
     for key, value in writes.items():

@@ -38,6 +38,7 @@ from app.routes.contradictions import router as contradictions_router
 from app.routes.corrections import router as corrections_router
 from app.routes.deliverable import router as deliverable_router
 from app.routes.entities import router as entities_router
+from app.routes.screen import router as screen_router
 from app.routes.watch import router as watch_router
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,9 @@ app.include_router(deliverable_router)
 app.include_router(entities_router)
 app.include_router(app_settings_router)
 app.include_router(watch_router)
+# /screen sits outside _PROTECTED_PREFIXES on purpose: the Outlook add-in has no
+# browser session — the endpoint's own X-Screen-Key check is its complete auth.
+app.include_router(screen_router)
 
 # API prefixes that require a valid session when auth is enabled. The SPA shell,
 # assets, /health, and /auth/login/logout stay open (the login page needs them).
@@ -502,6 +506,12 @@ def delete_portfolio(portfolio_id: int):
 # ---------------------------------------------------------------------------
 # Serve React frontend (must be last — catches all non-API routes)
 # ---------------------------------------------------------------------------
+
+# Outlook add-in files — served publicly (Outlook's runtime fetches them with no
+# session; the add-in authenticates to /screen with its key, not to these statics).
+_ADDIN_DIR = _PROJECT_ROOT / "addin"
+if _ADDIN_DIR.exists():
+    app.mount("/addin", StaticFiles(directory=_ADDIN_DIR), name="addin")
 
 if _WEB_DIST.exists():
     app.mount("/assets", StaticFiles(directory=_WEB_DIST / "assets"), name="assets")
