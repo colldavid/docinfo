@@ -37,6 +37,34 @@ const REQUEST_TIMEOUT_MS = 8000;
 // would blow the timeout budget for every other attachment on the message.
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
+// Ceiling on any single Office.js call. Some Outlook runtimes have been observed
+// never invoking a callback at all; without this, the handler hangs forever and
+// the user stares at an eternal "processing" dialog.
+const OFFICE_CALL_TIMEOUT_MS = 5000;
+
+// Absolute ceiling on the whole handler. Belt-and-braces guarantee that the
+// send dialog can never hang: when it fires, the send is allowed (fail-open).
+const HANDLER_WATCHDOG_MS = 20000;
+
+// Fire-and-forget breadcrumb to the server's access log, so handler progress is
+// visible in the uvicorn terminal without Outlook dev tools. Never awaited,
+// never allowed to throw.
+function trace(stage) {
+  try {
+    fetch(APP_BASE_URL + "/health?stage=" + encodeURIComponent(stage)).catch(function () {});
+  } catch (ignored) {}
+}
+
+// Resolves with `fallback` if `promise` doesn't settle within `ms`.
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise(function (resolve) {
+      setTimeout(function () { resolve(fallback); }, ms);
+    })
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Promise wrappers around Office.js callback APIs, so the handler reads linearly.
 // Each RESOLVES on failure instead of rejecting, returning a caller-supplied
@@ -114,7 +142,10 @@ async function collectRecipients(item) {
 // covers cloud/Url links, .eml items and calendar items: we have no bytes to screen,
 // so we let them through rather than guessing.
 async function collectAttachments(item) {
-  const listed = await getAttachments(item);
+  // Every Office.js call is capped: a callback that never fires must degrade to
+  // "couldn't read it" (fail-open), never to an eternal spinner.
+  const listed = await withTimeout(getAttachments(item), OFFICE_CALL_TIMEOUT_MS, []);
+  trace("attachments-listed-" + listed.length);
 
   const candidates = listed.filter(function (attachment) {
     return !attachment.isInline && attachment.size <= MAX_ATTACHMENT_BYTES;
@@ -122,13 +153,16 @@ async function collectAttachments(item) {
 
   const fetched = await Promise.all(
     candidates.map(async function (attachment) {
-      const result = await getAttachmentContent(item, attachment.id);
+      const result = await withTimeout(
+        getAttachmentContent(item, attachment.id), OFFICE_CALL_TIMEOUT_MS, null
+      );
       if (!result || result.format !== Office.MailboxEnums.AttachmentContentFormat.Base64) {
         return null;
       }
       return { filename: attachment.name, content_base64: result.content };
     })
   );
+  trace("attachments-content-read");
 
   return fetched.filter(function (entry) {
     return entry !== null;
@@ -142,21 +176,26 @@ async function collectAttachments(item) {
 // POSTs to /screen and returns the parsed verdict, or null on ANY problem
 // (timeout, transport error, non-200, unparseable body). null means "allow".
 async function requestVerdict(payload) {
-  const controller = new AbortController();
-  const timer = setTimeout(function () {
-    controller.abort();
-  }, REQUEST_TIMEOUT_MS);
+  // AbortController may not exist in every add-in runtime; a missing abort just
+  // means we rely on the handler watchdog instead of a precise fetch timeout.
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = controller
+    ? setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS)
+    : null;
 
   try {
-    const response = await fetch(APP_BASE_URL + "/screen", {
+    const options = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Screen-Key": SCREEN_API_KEY
       },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
+      body: JSON.stringify(payload)
+    };
+    if (controller) {
+      options.signal = controller.signal;
+    }
+    const response = await fetch(APP_BASE_URL + "/screen", options);
 
     // Any non-200 (auth failure, 500, rate limit) is treated as "no opinion".
     if (!response.ok) {
@@ -167,7 +206,9 @@ async function requestVerdict(payload) {
     // Includes the AbortError raised by the timeout above.
     return null;
   } finally {
-    clearTimeout(timer);
+    if (timer) {
+      clearTimeout(timer);
+    }
   }
 }
 
@@ -176,41 +217,73 @@ async function requestVerdict(payload) {
 // ---------------------------------------------------------------------------
 
 async function onMessageSendHandler(event) {
+  // Single completion point. Guards against double event.completed calls (which
+  // some runtimes treat as an error) and backs the watchdog below.
+  let done = false;
+  let watchdog = null;
+  function finish(result, stage) {
+    if (done) { return; }
+    done = true;
+    if (watchdog) { clearTimeout(watchdog); }
+    trace("finish-" + stage);
+    try { event.completed(result); } catch (ignored) {}
+  }
+
+  // Absolute guarantee: whatever hangs, the dialog resolves and mail flows.
+  watchdog = setTimeout(function () {
+    finish({ allowEvent: true }, "watchdog");
+  }, HANDLER_WATCHDOG_MS);
+
   try {
+    trace("handler-start");
     const item = Office.context.mailbox.item;
 
     // D1: attachments-only screening. No attachments means nothing to screen, so
     // skip the network call entirely and keep Send instant for ordinary email.
     const attachments = await collectAttachments(item);
     if (attachments.length === 0) {
-      event.completed({ allowEvent: true });
+      finish({ allowEvent: true }, "no-attachments");
       return;
     }
 
     const recipients = await collectRecipients(item);
+    trace("recipients-" + recipients.length);
     const verdict = await requestVerdict({ recipients: recipients, attachments: attachments });
 
     // Warn ONLY on an explicit "warn" verdict carrying a message to display.
     // Anything else - "allow", an unknown verdict, a null result from a failed
     // call - falls through to allowing the send.
     if (verdict && verdict.verdict === "warn" && verdict.message) {
-      event.completed({ allowEvent: false, errorMessage: verdict.message });
+      finish({ allowEvent: false, errorMessage: verdict.message }, "warn");
       return;
     }
 
-    event.completed({ allowEvent: true });
+    finish({ allowEvent: true }, verdict ? "allow" : "fetch-failed");
   } catch (error) {
     // Last line of defence. If anything above threw unexpectedly, the user's mail
     // still goes out - we never hold email hostage to a bug in this add-in.
-    event.completed({ allowEvent: true });
+    finish({ allowEvent: true }, "error");
   }
+}
+
+// Load-time breadcrumbs: prove in the server log that (1) this script executed
+// and (2) office.js completed its host handshake. Their absence on a test send
+// distinguishes "script never ran" from "office.js never initialized" from
+// "handler never dispatched".
+trace("script-loaded");
+
+// Kick the Office.js initialization handshake. In browser runtimes (Outlook on
+// the web / new Outlook), calling Office.onReady is what triggers office.js to
+// finish initializing against the host — without SOME call to it, event
+// dispatch may never reach the handler and the send dialog spins forever.
+// No logic belongs inside the callback (it never fires in classic Outlook's
+// JS-only runtime); the call itself is the point.
+if (typeof Office !== "undefined" && Office.onReady) {
+  Office.onReady(function () {
+    trace("office-ready");
+  });
 }
 
 // Maps the FunctionName in the manifest's LaunchEvent to this function. Required on
 // every platform.
-//
-// Note there is deliberately no Office.onReady() wrapper: in classic Outlook on
-// Windows the handler runs in a JavaScript-only runtime where Office.onReady and
-// Office.initialize never fire, so any startup logic placed there would be dead
-// code on that platform. All setup lives inside the handler itself.
 Office.actions.associate("onMessageSendHandler", onMessageSendHandler);

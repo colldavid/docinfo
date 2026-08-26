@@ -54,10 +54,34 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        # Outlook web / new Outlook run the Smart Alerts handler in a sandboxed
+        # runtime whose origin is the Outlook host, not our server — without
+        # these, the add-in's POST /screen is blocked by the browser. Auth is
+        # unaffected: /screen still requires the X-Screen-Key header.
+        "https://outlook.office.com",
+        "https://outlook.office365.com",
+        "https://outlook.live.com",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def addin_no_cache(request, call_next):
+    """
+    Forbid caching of add-in files. They sit behind Cloudflare's edge, which
+    caches .js by default — a stale cached handler is undebuggable (Outlook
+    runs old code while the repo shows new). no-store makes every fetch hit
+    the origin, which is what "edit screen.js, effective next send" requires.
+    """
+    response = await call_next(request)
+    if request.url.path.startswith("/addin"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
 
 # Feature routers (app/routes/) — must be registered before the SPA catch-all mount below.
 app.include_router(auth_router)

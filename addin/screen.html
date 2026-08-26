@@ -5,7 +5,9 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>DocInfo Send Screening</title>
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    <script src="screen.js"></script>
+    <!-- ?v= busts Cloudflare's edge cache, which caches .js by default and can
+         serve stale handler code. Bump on every screen.js change. -->
+    <script src="screen.js?v=3"></script>
   </head>
   <body>
     <!--
